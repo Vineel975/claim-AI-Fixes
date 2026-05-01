@@ -386,6 +386,7 @@ export function ResultView({
   }, []);
 
   const handleScrollToTariffPage = (pageNumber?: number | null, highlightText?: string, highlightName?: string) => {
+    console.log("[tariff-highlight] click: pageNumber=", pageNumber, "tariffFile=", !!tariffFile, "pdfContainerRef=", !!pdfContainerRef.current);
     if (!pdfContainerRef.current || !pageNumber || pageNumber <= 0) return;
     if (!tariffFile) return;
 
@@ -503,9 +504,11 @@ export function ResultView({
       const anchorTop = getSpanTopPx(anchorSpan);
       if (anchorTop === null) return;
 
-      // DEBUG: log all line tops to see actual gaps
+      // DEBUG
       console.log("[highlight] all line tops:", [...lineMap.keys()].sort((a,b)=>a-b));
       console.log("[highlight] anchorTop:", anchorTop, "bestScore:", bestScore);
+      console.log("[highlight] total positioned spans:", positionedSpans.length, "/ total spans:", spans.length);
+      console.log("[highlight] lineMap size:", lineMap.size, "lines");
 
       // A tariff table row can have a multi-line description.
       // We find all positioned spans, group them by top value into visual lines,
