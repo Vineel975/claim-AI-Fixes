@@ -444,8 +444,14 @@ export function ResultView({
       // Step 1: find anchor span — prefer name match, fallback to amount
       let anchorSpan: HTMLElement | null = null;
 
+      console.log("[tariff-highlight] doHighlight: total spans=", spans.length, "highlightText=", highlightText, "highlightName=", highlightName);
+
       // Only consider spans that have a real position (style.top with calc/px)
       const positionedSpans = spans.filter(s => getSpanTopPx(s) !== null);
+      console.log("[tariff-highlight] positioned spans=", positionedSpans.length);
+      if (positionedSpans.length > 0) {
+        console.log("[tariff-highlight] sample span style.top:", positionedSpans[0].style.top, "text:", positionedSpans[0].textContent?.slice(0, 40));
+      }
 
       // Group positioned spans by line (top ±2px) into a map: topPx -> spans[]
       const lineMap = new Map<number, HTMLElement[]>();
