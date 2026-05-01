@@ -443,27 +443,57 @@ export function ResultView({
       // Only consider spans that have a real position (style.top with calc/px)
       const positionedSpans = spans.filter(s => getSpanTopPx(s) !== null);
 
-      // Try name match first (most unique)
-      if (nameWords.length > 0) {
-        for (const span of positionedSpans) {
-          const t = normalize(span.textContent || "");
-          if (t && nameWords.some(w => t.includes(w))) {
-            anchorSpan = span;
+      // Group positioned spans by line (top ±2px) into a map: topPx -> spans[]
+      const lineMap = new Map<number, HTMLElement[]>();
+      for (const span of positionedSpans) {
+        const t = getSpanTopPx(span)!;
+        const existing = [...lineMap.keys()].find(k => Math.abs(k - t) <= 2);
+        if (existing !== undefined) {
+          lineMap.get(existing)!.push(span);
+        } else {
+          lineMap.set(t, [span]);
+        }
+      }
+
+      // Score each line: count how many name words appear in the full line text
+      // Also bonus if the line contains the exact amount digits
+      let bestScore = -1;
+      let bestLineTop: number | null = null;
+
+      for (const [topPx, lineSpans] of lineMap) {
+        const lineText = normalize(lineSpans.map(s => s.textContent || "").join(" "));
+        const lineDigits = lineText.replace(/[^0-9]/g, "");
+
+        let score = 0;
+        // Each name word that appears in the line text adds to score
+        for (const w of nameWords) {
+          if (lineText.includes(w)) score += 2;
+        }
+        // Exact amount match is a strong signal
+        if (amountDigits && lineDigits.includes(amountDigits)) score += 3;
+        // Penalise very short lines (likely header/label cells, not data rows)
+        if (lineText.length < 5) score -= 2;
+
+        if (score > bestScore) {
+          bestScore = score;
+          bestLineTop = topPx;
+        }
+      }
+
+      // Fallback: match purely by amount if no name match found
+      if ((bestScore <= 0 || bestLineTop === null) && amountDigits.length > 0) {
+        for (const [topPx, lineSpans] of lineMap) {
+          const lineDigits = lineSpans.map(s => s.textContent || "").join("").replace(/[^0-9]/g, "");
+          if (lineDigits.includes(amountDigits)) {
+            bestLineTop = topPx;
             break;
           }
         }
       }
 
-      // Fallback: match by amount digits (strips commas/spaces)
-      if (!anchorSpan && amountDigits.length > 0) {
-        for (const span of positionedSpans) {
-          const digits = (span.textContent || "").replace(/[^0-9]/g, "");
-          if (digits && digits === amountDigits) {
-            anchorSpan = span;
-            break;
-          }
-        }
-      }
+      if (bestLineTop === null) return;
+      // Set anchorSpan to first span on the best line (for row detection below)
+      anchorSpan = lineMap.get([...lineMap.keys()].find(k => Math.abs(k - bestLineTop!) <= 2)!)![0];
 
       if (!anchorSpan) return;
 
