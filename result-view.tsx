@@ -424,6 +424,9 @@ export function ResultView({
       clearHighlights();
       wrapper.scrollIntoView({ behavior: "smooth", block: "start" });
 
+      // If no highlight text/name provided, just scroll — don't attempt matching
+      if (!highlightText && !highlightName) return;
+
       const textLayer = wrapper.querySelector(".react-pdf__Page__textContent");
       if (!textLayer) return;
 
@@ -500,6 +503,10 @@ export function ResultView({
       const anchorTop = getSpanTopPx(anchorSpan);
       if (anchorTop === null) return;
 
+      // DEBUG: log all line tops to see actual gaps
+      console.log("[highlight] all line tops:", [...lineMap.keys()].sort((a,b)=>a-b));
+      console.log("[highlight] anchorTop:", anchorTop, "bestScore:", bestScore);
+
       // A tariff table row can have a multi-line description.
       // We find all positioned spans, group them by top value into visual lines,
       // then find which line(s) the anchor belongs to and also include the
@@ -572,7 +579,10 @@ export function ResultView({
         const textLayer = targetWrapper.querySelector(".react-pdf__Page__textContent");
         const spans = textLayer ? textLayer.querySelectorAll("span") : [];
 
-        if (spans.length > 0) {
+        // If no highlight needed, scroll immediately regardless of text layer
+        if (!highlightText && !highlightName) {
+          doHighlight(targetWrapper);
+        } else if (spans.length > 0) {
           doHighlight(targetWrapper);
         } else if (attemptsLeft > 0) {
           tryHighlight(attemptsLeft - 1);
