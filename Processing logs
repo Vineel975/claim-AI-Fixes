@@ -1,0 +1,90 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+import type { ProcessingState } from "@/src/processing-service";
+
+interface ProcessingLogsProps {
+  isProcessing: boolean;
+  state?: ProcessingState;
+  showLogs: boolean;
+  onToggleLogs: (value: boolean) => void;
+  logs: Array<{ id: string; message: string }>;
+}
+
+export function ProcessingLogs({ isProcessing, state }: ProcessingLogsProps) {
+  const [displayPct, setDisplayPct] = useState(0);
+  const rafRef  = useRef<number | null>(null);
+  const startTs = useRef<number | null>(null);
+
+  // Real completion from Convex (0 or 1 in practice)
+  const realCompleted = state?.completed ?? 0;
+  const realTotal     = state?.total ?? 1;
+  const realPct       = realTotal > 0 ? Math.round((realCompleted / realTotal) * 100) : 0;
+  const isDone        = realPct >= 100;
+
+  useEffect(() => {
+    if (isDone) {
+      setDisplayPct(100);
+      return;
+    }
+
+    // Animate from current displayPct toward ~90% over ~50 seconds using easeOut
+    // so it slows down as it approaches 90 and never reaches 100 until truly done.
+    const TARGET    = 90;   // never auto-reach 100
+    const DURATION  = 50000; // 50 s
+
+    if (startTs.current === null) startTs.current = performance.now();
+
+    const tick = (now: number) => {
+      const elapsed = now - (startTs.current ?? now);
+      const t = Math.min(elapsed / DURATION, 1);
+      // easeOutCubic — fast start, slows near the end
+      const eased = 1 - Math.pow(1 - t, 3);
+      const next  = Math.round(eased * TARGET);
+      setDisplayPct(prev => Math.max(prev, next)); // never go backwards
+      if (t < 1 && !isDone) {
+        rafRef.current = requestAnimationFrame(tick);
+      }
+    };
+
+    rafRef.current = requestAnimationFrame(tick);
+    return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); };
+  }, [isDone]);
+
+  const pct          = isDone ? 100 : displayPct;
+  const radius       = 54;
+  const circumference = 2 * Math.PI * radius;
+  const dashOffset   = circumference - (pct / 100) * circumference;
+
+  return (
+    <div className="flex-1 flex flex-col items-center justify-center gap-5">
+
+      {/* Circular progress ring */}
+      <div className="relative flex items-center justify-center">
+        <svg width="140" height="140" className="-rotate-90">
+          <circle cx="70" cy="70" r={radius} fill="none" stroke="#e2e8f0" strokeWidth="10" />
+          <circle
+            cx="70" cy="70" r={radius}
+            fill="none"
+            stroke="#1E3A8A"
+            strokeWidth="10"
+            strokeLinecap="round"
+            strokeDasharray={circumference}
+            strokeDashoffset={dashOffset}
+            style={{ transition: "stroke-dashoffset 0.3s ease" }}
+          />
+        </svg>
+        <div className="absolute flex flex-col items-center">
+          <span className="text-2xl font-bold text-[#1E3A8A]">{pct}%</span>
+        </div>
+      </div>
+
+      {/* Text */}
+      <div className="text-center space-y-1">
+        <p className="text-base font-semibold text-slate-700">AI Summary is loading…</p>
+        <p className="text-xs text-slate-400">Please wait 40 – 60 seconds</p>
+      </div>
+
+    </div>
+  );
+}
