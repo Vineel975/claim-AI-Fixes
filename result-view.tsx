@@ -518,17 +518,25 @@ export function ResultView({
       const anchorLineIdx = topValues.findIndex(v => Math.abs(v - anchorTop) <= 2);
       if (anchorLineIdx === -1) return;
 
-      // Step 3: determine which lines belong to this row.
-      // A table row's description may wrap onto the next line.
-      // Include anchor line + next line only if the next line has NO amount-only spans
-      // (i.e. it's a continuation, not a new row). Be conservative: include ±1 line.
+      // Step 3: only include the anchor line.
+      // For wrapped descriptions, the continuation line contains ONLY text (no numbers).
+      // Include it only if: gap to next line is small (<12px) AND the next line has no digits.
       const linesToHighlight = new Set<number>();
       linesToHighlight.add(anchorLineIdx);
 
-      // Check next line — include if it exists and gap to anchor is small (< 20px = wrapped text)
       const nextIdx = anchorLineIdx + 1;
-      if (nextIdx < topValues.length && Math.abs(topValues[nextIdx] - anchorTop) < 20) {
-        linesToHighlight.add(nextIdx);
+      if (nextIdx < topValues.length) {
+        const gap = Math.abs(topValues[nextIdx] - anchorTop);
+        const nextLineSpans = spans.filter(s => {
+          const t = getSpanTopPx(s);
+          return t !== null && Math.abs(t - topValues[nextIdx]) <= 2;
+        });
+        const nextLineText = nextLineSpans.map(s => s.textContent || "").join("").trim();
+        const nextLineHasNumbers = /\d{3,}/.test(nextLineText); // 3+ digit number = amount col
+        // Only include as continuation if gap is small AND no amounts on next line
+        if (gap < 12 && !nextLineHasNumbers) {
+          linesToHighlight.add(nextIdx);
+        }
       }
 
       // Step 4: highlight all spans on those lines
