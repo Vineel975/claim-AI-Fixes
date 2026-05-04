@@ -30,6 +30,7 @@ interface FinancialSummaryTabProps {
   eyeType?: EyeType | null;
   isAllInclusivePackage: boolean;
   tariffPageNumber?: number | null;
+  tariffFileName?: string | null;
   tariffNotes?: string | null;
   tariffClarificationNote?: string | null;
   tariffExtractionItem?: TariffBreakdownItem[] | null;
@@ -60,6 +61,7 @@ export function FinancialSummaryTab({
   lensTypePageNumber,
   lensTypeApproved,
   isAllInclusivePackage,
+  tariffFileName,
   tariffNotes,
   tariffClarificationNote,
   tariffExtractionItem,
@@ -504,6 +506,11 @@ export function FinancialSummaryTab({
                   </button>
                 )}
               </div>
+              {tariffFileName && (
+                <p className="text-xs text-green-600 mb-2 truncate" title={tariffFileName}>
+                  📄 {tariffFileName.replace(/\.pdf$/i, "")}
+                </p>
+              )}
               <div className="space-y-1 border-t border-green-200 pt-2">
                 {tariffRows.map((row) => {
                   const canHighlight = tariffLinkable && !!row.amount;
