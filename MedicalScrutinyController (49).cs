@@ -9454,7 +9454,7 @@ namespace Enrollment.Controllers
                     allowed       = allowed,
                     claimTypeId   = claimTypeId,
                     requestTypeId = requestTypeId,
-                    reason        = allowed ? "OK" : "ClaimTypeID=" + claimTypeId + ", RequestTypeID=" + requestTypeId + " - AI Summary requires both = 1"
+                    reason        = allowed ? "OK" : "AI Summary is only available for Reimbursement Claim Type"
                 }, JsonRequestBehavior.AllowGet);
             }
             catch (Exception ex)
