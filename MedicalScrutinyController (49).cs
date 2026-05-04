@@ -9463,6 +9463,58 @@ namespace Enrollment.Controllers
             }
         }
 
+        /// <summary>
+        /// POST /MedicalScrutiny/FinalizeClaimAISave
+        /// Called after all ClaimAI saves complete. Sets BillingCorrection=2 and IsAprvFacilitychanged=1
+        /// so that Claim Actions validation passes on next page load.
+        /// </summary>
+        [HttpPost]
+        public ActionResult FinalizeClaimAISave(string claimId = null, string slNo = null)
+        {
+            try
+            {
+                long claimIdLong;
+                int slNoInt;
+                if (!long.TryParse((claimId ?? "").Trim(), out claimIdLong) || claimIdLong <= 0)
+                    return Json(new { success = false, message = "Invalid ClaimID" });
+                if (!int.TryParse((slNo ?? "1").Trim(), out slNoInt)) slNoInt = 1;
+
+                string connStr = System.Configuration.ConfigurationManager
+                                       .ConnectionStrings["McarePlusEntities"].ConnectionString;
+                if (connStr.StartsWith("metadata=", StringComparison.OrdinalIgnoreCase))
+                {
+                    var m = System.Text.RegularExpressions.Regex.Match(
+                        connStr, @"provider connection string=""([^""]+)""",
+                        System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                    if (m.Success) connStr = m.Groups[1].Value.Replace("&quot;", """);
+                }
+
+                using (var conn = new System.Data.SqlClient.SqlConnection(connStr))
+                {
+                    conn.Open();
+
+                    // Set BillingCorrection=2 on Claimsdetails so billing validation passes
+                    var cmd1 = conn.CreateCommand();
+                    cmd1.CommandText = @"
+                        UPDATE Claimsdetails
+                        SET    BillingCorrection    = 2,
+                               IsAprvFacilitychanged = 1
+                        WHERE  ClaimID = @ClaimID
+                          AND  Slno    = @SlNo
+                          AND  ISNULL(Deleted, 0) = 0";
+                    cmd1.Parameters.AddWithValue("@ClaimID", claimIdLong);
+                    cmd1.Parameters.AddWithValue("@SlNo",    slNoInt);
+                    cmd1.ExecuteNonQuery();
+                }
+
+                return Json(new { success = true });
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = ex.Message });
+            }
+        }
+
         public ActionResult GetBSIForClaimAI(string claimId)
         {
             // Allow ClaimAI's Next.js server to call this endpoint (URL from Web.config ClaimAIUrl)
