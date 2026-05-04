@@ -9063,17 +9063,23 @@
                 if (event.data.type === 'claimAISaveComplete') {
                     var savedJobId = event.data.jobId || '';
 
-                    // All AJAX saves (clinical, billing, coding) already triggered
-                    // via postMessages before claimAISaveComplete fires.
-                    // Just store jobId and reload — no button clicks needed
-                    // (btnServiceBillDetailsSave is type=submit and causes navigation)
+                    // Show success toast
+                    var $successToast = $('<div/>').text('✓ AI Summary saved successfully')
+                        .css({ position: 'fixed', bottom: '30px', right: '30px',
+                               background: '#2e7d32', color: '#fff',
+                               padding: '12px 20px', borderRadius: '6px',
+                               fontSize: '14px', fontWeight: 'bold',
+                               zIndex: 99999, boxShadow: '0 3px 10px rgba(0,0,0,0.3)' })
+                        .appendTo('body');
+
                     setTimeout(function() {
                         if (savedJobId) {
                             sessionStorage.setItem('claimAI_jobId', savedJobId);
                             sessionStorage.setItem('claimAI_claimId', $('#hdnClaimID').val());
                         }
+                        $successToast.fadeOut(300, function() { $successToast.remove(); });
                         window.location.reload();
-                    }, 1500);
+                    }, 2000);
 
                     // Collapse AI summary widget immediately
                     var $widget = $('#divAiSummary');
