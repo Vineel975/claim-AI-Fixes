@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Web;
@@ -8386,7 +8386,8 @@ namespace Enrollment.Controllers
                     if (innerZipCandidates.Count > 0)
                     {
                         // Pick best inner zip by rules
-                        byte[] bestZipBytes = PickBestTariffFile(innerZipCandidates, isPsu, insurerCode);
+                        var bestZipResult = PickBestTariffFile(innerZipCandidates, isPsu, insurerCode);
+                        byte[] bestZipBytes = bestZipResult?.Item2;
                         // Extract best PDF from that inner zip
                         var innerPdfCandidates = new System.Collections.Generic.List<System.Tuple<string, DateTime, byte[]>>();
                         using (var innerMs = new System.IO.MemoryStream(bestZipBytes))
