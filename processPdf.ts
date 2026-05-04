@@ -78,6 +78,7 @@ type TariffMatchResult = {
   matchScore?: number;
   matchStrategy?: "fuzzy" | "token_subset";
   reason?: string;
+  matchedFileName?: string;
 };
 
 
@@ -497,6 +498,7 @@ async function resolveTariffForResult(
       tariffCost,
       tariffUsage,
       reason: tariffExtractionItem !== undefined ? "tariff_extracted_from_upload" : "tariff_not_extracted_from_upload",
+      matchedFileName: jobFiles.find((f: any) => f.fileType === "tariff")?.fileName ?? undefined,
     };
   }
 
@@ -726,6 +728,9 @@ export const processPdfInternal = internalAction({
           ),
         });
 
+      if (tariffMatch.matchedFileName) {
+        result.analysis.tariffFileName = tariffMatch.matchedFileName;
+      }
       if (tariffMatch.tariffExtractionItem !== undefined && tariffMatch.tariffExtractionItem !== null) {
         result.analysis.tariffExtractionItem = tariffMatch.tariffExtractionItem;
         tariffExtractedCount++;
