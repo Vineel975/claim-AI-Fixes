@@ -39,6 +39,7 @@ function getBasename(filePath: string): string {
 interface ResultViewProps {
   hospitalBill: File | string | null;
   tariffFile: File | string | null;
+  tariffFileName?: string | null;
   showSampleData: boolean;
   state: ProcessingState | undefined;
   isProcessing: boolean;
@@ -136,6 +137,7 @@ export function ResultView({
   onDocumentLoadSuccess,
   onDocumentLoadError,
   pdfError,
+  tariffFileName: tariffFileNameProp,
   spectraFields,
 }: ResultViewProps) {
   const updateResult = useConvexMutation(api.processing.updateResult);
@@ -1530,7 +1532,7 @@ export function ResultView({
                     eyeType={displayAnalysis?.eyeType}
                     isAllInclusivePackage={displayAnalysis?.isAllInclusivePackage ?? false}
                     tariffPageNumber={displayAnalysis?.tariffPageNumber}
-                    tariffFileName={displayAnalysis?.tariffFileName}
+                    tariffFileName={tariffFileNameProp ?? displayAnalysis?.tariffFileName}
                     tariffNotes={displayAnalysis?.tariffNotes}
                     tariffClarificationNote={displayAnalysis?.tariffClarificationNote}
                     tariffExtractionItem={displayAnalysis?.tariffExtractionItem}
