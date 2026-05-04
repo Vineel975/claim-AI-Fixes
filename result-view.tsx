@@ -1288,7 +1288,8 @@ export function ResultView({
 
       setEditedAnalysis(analysisToSave);
 
-      alert("Changes saved successfully!");
+      // Don't use alert() — it blocks postMessage flow in iframe context.
+      // Spectra will show its own toast via claimAISaveComplete postMessage.
 
       // Send Refer to Insurer data — built from field mismatches + missing documents
       // Uses buildQueryMessage() which checks:
