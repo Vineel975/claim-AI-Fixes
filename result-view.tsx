@@ -473,6 +473,15 @@ export function ResultView({
       else lineMap.set(t, [span]);
     }
 
+    // DEBUG: log all lines with their text and top values
+    console.log("[tariff-highlight] lineMap size:", lineMap.size);
+    const sortedLines = [...lineMap.entries()].sort((a,b) => a[0]-b[0]);
+    sortedLines.forEach(([top, lineSpans]) => {
+      const txt = lineSpans.map(s => s.textContent||"").join("|");
+      console.log(`  line top=${top.toFixed(1)} text="${txt.slice(0,80)}"`);
+    });
+    console.log("[tariff-highlight] searching for name:", normName, "amount:", amountDigits);
+
     // Score each line — must score above threshold to be highlighted
     type LineScoredEntry = { topPx: number; score: number; nameHits: number; exactAmount: boolean };
     const scored: LineScoredEntry[] = [];
