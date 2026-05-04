@@ -463,6 +463,49 @@ export function ResultView({
     const nameWords   = normName.split(" ").filter(w => w.length > 3);
 
     const positionedSpans = spans.filter(s => getSpanTopPx(s) !== null);
+    const allTops = [...new Set(
+      positionedSpans.map(s => getSpanTopPx(s)).filter(t => t !== null) as number[]
+    )].sort((a, b) => a - b);
+
+    const highlightLine = (anchorTop: number) => {
+      const anchorIdx = allTops.findIndex(t => Math.abs(t - anchorTop) <= 2);
+      const linesToHighlight = new Set([anchorIdx]);
+      if (anchorIdx + 1 < allTops.length) {
+        const nextTop = allTops[anchorIdx + 1];
+        const nextText = positionedSpans
+          .filter(s => Math.abs(getSpanTopPx(s)! - nextTop) <= 2)
+          .map(s => s.textContent || "").join("");
+        if (Math.abs(nextTop - anchorTop) < 15 && !/[0-9]/.test(nextText)) {
+          linesToHighlight.add(anchorIdx + 1);
+        }
+      }
+      positionedSpans.forEach(span => {
+        const t = getSpanTopPx(span)!;
+        const idx = allTops.findIndex(v => Math.abs(v - t) <= 2);
+        if (linesToHighlight.has(idx)) applyHighlight(span);
+      });
+    };
+
+    // STRATEGY A: pdfText direct search — when highlightName is absent,
+    // highlightText is the AI-extracted verbatim PDF text. Search word-by-word.
+    if (!highlightName && highlightText && highlightText.length > 5) {
+      const searchWords = normalize(highlightText).split(" ").filter(w => w.length > 3);
+      if (searchWords.length > 0) {
+        let bestSpan: HTMLElement | null = null;
+        let bestHits = 0;
+        for (const span of positionedSpans) {
+          const t = normalize(span.textContent || "");
+          if (!t) continue;
+          const hits = searchWords.filter(w => t.includes(w)).length;
+          if (hits > bestHits) { bestHits = hits; bestSpan = span; }
+        }
+        if (bestSpan && bestHits >= Math.min(2, searchWords.length)) {
+          highlightLine(getSpanTopPx(bestSpan)!);
+          pendingHighlightRef.current = null;
+          return;
+        }
+      }
+    }
 
     // Group into lines
     const lineMap = new Map<number, HTMLElement[]>();
@@ -523,65 +566,82 @@ export function ResultView({
       if (nameIdx === -1 && amountIdx !== -1) nameIdx = amountIdx;
 
       // Highlight matched name span and its corresponding amount span
-      if (nameIdx !== -1 && nameIdx < nameSpans.length) applyHighlight(nameSpans[nameIdx]);
+      if (nameIdx !== -1 && nameIdx < nameSpans.length) {
+        const t = getSpanTopPx(nameSpans[nameIdx]);
+        if (t !== null) highlightLine(t);
+      }
       if (amountIdx !== -1 && amountIdx < amountSpans.length) applyHighlight(amountSpans[amountIdx]);
 
       pendingHighlightRef.current = null;
       return;
     }
 
-    // Standard layout — score each line normally
-    type LineScoredEntry = { topPx: number; score: number; nameHits: number; exactAmount: boolean };
-    const scored: LineScoredEntry[] = [];
-
-    for (const { top: topPx, text: lineText } of allLines) {
-      const lineDigits  = lineText.replace(/[^0-9]/g, "");
-      let nameHits = 0;
-      for (const w of nameWords) { if (lineText.includes(w)) nameHits++; }
-      const exactAmount = amountDigits.length > 0 && lineDigits === amountDigits;
-      const looseAmount = amountDigits.length > 0 && lineDigits.includes(amountDigits);
-      const score = (nameHits * 2) + (exactAmount ? 5 : looseAmount ? 1 : 0);
-      scored.push({ topPx, score, nameHits, exactAmount });
-    }
-
-    scored.sort((a, b) => b.score - a.score);
-    const best = scored[0];
-    if (!best || (best.nameHits === 0 && !best.exactAmount)) {
-      if (amountDigits.length > 0) {
-        const exactLine = scored.find(s => s.exactAmount);
-        if (!exactLine) { pendingHighlightRef.current = null; return; }
-        var bestLineTop: number | null = exactLine.topPx;
-      } else { pendingHighlightRef.current = null; return; }
-    } else {
-      var bestLineTop: number | null = best.topPx;
-    }
-
-    const anchorKey = [...lineMap.keys()].find(k => Math.abs(k - bestLineTop!) <= 2);
-    if (anchorKey === undefined) { pendingHighlightRef.current = null; return; }
-    const anchorSpan = lineMap.get(anchorKey)![0];
-    const anchorTop  = getSpanTopPx(anchorSpan);
-    if (anchorTop === null) { pendingHighlightRef.current = null; return; }
-
+    // Standard layout — find best matching line using amount + name
     const topValues = [...lineMap.keys()].sort((a, b) => a - b);
-    const anchorLineIdx = topValues.findIndex(v => Math.abs(v - anchorTop) <= 2);
-    if (anchorLineIdx === -1) { pendingHighlightRef.current = null; return; }
 
-    const linesToHighlight = new Set<number>();
-    linesToHighlight.add(anchorLineIdx);
-    const nextIdx = anchorLineIdx + 1;
-    if (nextIdx < topValues.length) {
-      const gap       = Math.abs(topValues[nextIdx] - anchorTop);
-      const nextSpans = spans.filter(s => { const t = getSpanTopPx(s); return t !== null && Math.abs(t - topValues[nextIdx]) <= 2; });
-      const nextText  = nextSpans.map(s => s.textContent || "").join("").trim();
-      if (gap < 10 && !/[0-9]/.test(nextText)) linesToHighlight.add(nextIdx);
+    // Strategy 1: find the amount span directly (most reliable anchor)
+    let amountAnchorTop: number | null = null;
+    if (amountDigits.length > 0) {
+      for (const span of positionedSpans) {
+        const spanDigits = (span.textContent || "").replace(/[^0-9]/g, "");
+        if (spanDigits === amountDigits) {
+          amountAnchorTop = getSpanTopPx(span);
+          break;
+        }
+      }
     }
 
-    spans.forEach(span => {
-      const t = getSpanTopPx(span);
-      if (t === null) return;
-      const lineIdx = topValues.findIndex(v => Math.abs(v - t) <= 2);
-      if (linesToHighlight.has(lineIdx)) applyHighlight(span);
-    });
+    // Strategy 2: find the name span (most words matching)
+    let nameAnchorTop: number | null = null;
+    if (nameWords.length > 0) {
+      let bestHits = 0;
+      for (const span of positionedSpans) {
+        const t = normalize(span.textContent || "");
+        const hits = nameWords.filter(w => t.includes(w)).length;
+        if (hits > bestHits) { bestHits = hits; nameAnchorTop = getSpanTopPx(span); }
+      }
+    }
+
+    // If both found, highlight both their lines + any lines in between
+    if (amountAnchorTop !== null && nameAnchorTop !== null) {
+      const minTop = Math.min(amountAnchorTop, nameAnchorTop);
+      const maxTop = Math.max(amountAnchorTop, nameAnchorTop);
+      // Only highlight lines between name and amount if they're close (same entry)
+      // Use a generous threshold: up to 4 lines apart
+      const minIdx = topValues.findIndex(v => Math.abs(v - minTop) <= 2);
+      const maxIdx = topValues.findIndex(v => Math.abs(v - maxTop) <= 2);
+      if (minIdx !== -1 && maxIdx !== -1 && (maxIdx - minIdx) <= 4) {
+        // Highlight all lines from name to amount (inclusive)
+        for (let i = minIdx; i <= maxIdx; i++) {
+          const lineTop = topValues[i];
+          positionedSpans.forEach(span => {
+            const t = getSpanTopPx(span);
+            if (t !== null && Math.abs(t - lineTop) <= 2) applyHighlight(span);
+          });
+        }
+      } else {
+        // Too far apart — just highlight the two individual spans
+        positionedSpans.forEach(span => {
+          const t = getSpanTopPx(span);
+          if (t === null) return;
+          if (amountAnchorTop !== null && Math.abs(t - amountAnchorTop) <= 2) {
+            const digits = (span.textContent || "").replace(/[^0-9]/g, "");
+            if (digits === amountDigits) applyHighlight(span);
+          }
+          if (nameAnchorTop !== null && Math.abs(t - nameAnchorTop) <= 2) {
+            const txt = normalize(span.textContent || "");
+            if (nameWords.some(w => txt.includes(w))) applyHighlight(span);
+          }
+        });
+      }
+      pendingHighlightRef.current = null;
+      return;
+    }
+
+    // Only one anchor found — highlight just that line
+    const singleAnchorTop = amountAnchorTop ?? nameAnchorTop;
+    if (singleAnchorTop === null) { pendingHighlightRef.current = null; return; }
+    highlightLine(singleAnchorTop);
 
     pendingHighlightRef.current = null;
   };
