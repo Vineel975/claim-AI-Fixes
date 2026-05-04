@@ -389,7 +389,7 @@ export function ResultView({
   }, []);
 
   // Pending highlight request — survives re-renders caused by setActivePdfFile
-  const pendingHighlightRef = useRef<{ pageNumber: number; highlightText?: string; highlightName?: string } | null>(null);
+  const pendingHighlightRef = useRef<{ pageNumber: number; highlightText?: string; highlightName?: string; rowTopPct?: number; rowBottomPct?: number } | null>(null);
   const highlightAttemptsRef = useRef(0);
   const highlightTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -398,7 +398,7 @@ export function ResultView({
     console.log("[tariff-highlight] runHighlight called, req=", req, "pdfContainerRef=", !!pdfContainerRef.current);
     if (!req || !pdfContainerRef.current) return;
 
-    const { pageNumber, highlightText, highlightName } = req;
+    const { pageNumber, highlightText, highlightName, rowTopPct, rowBottomPct } = req;
 
     const normalize = (s: string) => s.replace(/[,\s]+/g, " ").trim().toLowerCase();
 
@@ -526,94 +526,48 @@ export function ResultView({
       }
     }
 
-    // STRATEGY B: pdfjs text content API — for scanned/image PDFs where DOM spans are empty.
-    if (!highlightName && highlightText && highlightText.length > 5 && tariffFile) {
-      const searchWords = normalize(highlightText).split(" ").filter(w => w.length > 3);
-      console.log("[tariff-highlight] Strategy B starting, searchWords=", searchWords, "tariffFile type=", typeof tariffFile);
-      if (searchWords.length > 0) {
-        (async () => {
-          try {
-            const loadingTask = pdfjs.getDocument(
-              typeof tariffFile === "string" ? tariffFile : URL.createObjectURL(tariffFile as File)
-            );
-            const pdf = await loadingTask.promise;
-            console.log("[tariff-highlight] Strategy B: pdf loaded, numPages=", pdf.numPages);
-            const page = await pdf.getPage(pageNumber);
-            const textContent = await page.getTextContent();
-            const viewport = page.getViewport({ scale: 1 });
-            console.log("[tariff-highlight] Strategy B: textContent items=", textContent.items.length,
-              "sample:", (textContent.items as any[]).slice(0,3).map((i:any) => i.str));
+    // STRATEGY B: use AI-provided row coordinates (pdfRowTopPct/pdfRowBottomPct) to draw
+    // a canvas overlay. This works for scanned PDFs with no embedded text.
+    if (rowTopPct && rowBottomPct && rowTopPct > 0) {
+      console.log("[tariff-highlight] Strategy B: using AI coordinates", rowTopPct, rowBottomPct);
+      const canvas = targetWrapper.querySelector("canvas") as HTMLCanvasElement | null;
+      if (canvas) {
+        const canvasRect   = canvas.getBoundingClientRect();
+        const containerRect = pdfContainerRef.current!.getBoundingClientRect();
+        const scrollTop    = pdfContainerRef.current!.scrollTop;
 
-            // Find best matching text item
-            let bestItem: any = null;
-            let bestHits = 0;
-            for (const item of textContent.items as any[]) {
-              const t = normalize(item.str || "");
-              if (!t) continue;
-              const hits = searchWords.filter(w => t.includes(w)).length;
-              if (hits > bestHits) { bestHits = hits; bestItem = item; }
-            }
+        const canvasOffsetTop  = canvasRect.top  - containerRect.top  + scrollTop;
+        const canvasOffsetLeft = canvasRect.left - containerRect.left;
+        const canvasHeight     = canvasRect.height;
+        const canvasWidth      = canvasRect.width;
 
-            console.log("[tariff-highlight] Strategy B: bestHits=", bestHits, "bestItem=", bestItem?.str, "threshold=", Math.min(2, searchWords.length));
-            if (!bestItem || bestHits < Math.min(2, searchWords.length)) return;
+        // Convert % of page to px within canvas
+        const topPx    = canvasOffsetTop  + (rowTopPct    / 100) * canvasHeight;
+        const bottomPx = canvasOffsetTop  + (rowBottomPct / 100) * canvasHeight;
+        const height   = Math.max(bottomPx - topPx, 14);
 
-            // Get the canvas element for this page to compute overlay position
-            const canvas = targetWrapper.querySelector("canvas") as HTMLCanvasElement | null;
-            if (!canvas) return;
+        pdfContainerRef.current!.querySelectorAll(".tariff-highlight-overlay").forEach(el => el.remove());
 
-            const canvasRect = canvas.getBoundingClientRect();
-            const containerRect = pdfContainerRef.current!.getBoundingClientRect();
-            const scrollTop = pdfContainerRef.current!.scrollTop;
-
-            // pdfjs transform: [scaleX, skewX, skewY, scaleY, tx, ty]
-            const [,, , scaleY, tx, ty] = bestItem.transform;
-            const scaleX = bestItem.transform[0];
-            const pdfScale = canvas.width / viewport.width;
-
-            // Convert PDF coords to canvas pixels
-            const x = tx * pdfScale;
-            const y = (viewport.height - ty) * pdfScale;
-            const w = (bestItem.width || 100) * pdfScale;
-            const h = Math.abs(scaleY) * pdfScale * 1.4;
-
-            // Convert canvas pixels to container-relative coords
-            const canvasOffsetTop = canvasRect.top - containerRect.top + scrollTop;
-            const canvasOffsetLeft = canvasRect.left - containerRect.left;
-            const canvasScaleX = canvasRect.width / canvas.width;
-            const canvasScaleY = canvasRect.height / canvas.height;
-
-            // Remove any existing overlay
-            pdfContainerRef.current!.querySelectorAll(".tariff-highlight-overlay").forEach(el => el.remove());
-
-            const overlay = document.createElement("div");
-            overlay.className = "tariff-highlight-overlay";
-            overlay.style.cssText = `
-              position: absolute;
-              left: ${canvasOffsetLeft + x * canvasScaleX}px;
-              top: ${canvasOffsetTop + y * canvasScaleY}px;
-              width: ${w * canvasScaleX}px;
-              height: ${h * canvasScaleY}px;
-              background: rgba(251, 191, 36, 0.45);
-              border: 2px solid rgba(217, 119, 6, 0.8);
-              border-radius: 3px;
-              pointer-events: none;
-              z-index: 10;
-            `;
-
-            // Container must be position:relative for absolute child to work
-            (pdfContainerRef.current as HTMLElement).style.position = "relative";
-            pdfContainerRef.current!.appendChild(overlay);
-            console.log("[tariff-highlight] Strategy B: overlay appended at",
-              overlay.style.left, overlay.style.top, "size", overlay.style.width, overlay.style.height,
-              "canvas rect:", canvasRect, "canvasOffsetTop:", canvasOffsetTop,
-              "pdfScale:", pdfScale, "bestItem transform:", bestItem.transform);
-          } catch (e) {
-            console.warn("[tariff-highlight] Strategy B failed:", e);
-          }
-        })();
-        pendingHighlightRef.current = null;
-        return;
+        const overlay = document.createElement("div");
+        overlay.className = "tariff-highlight-overlay";
+        overlay.style.cssText = `
+          position: absolute;
+          left: ${canvasOffsetLeft}px;
+          top: ${topPx}px;
+          width: ${canvasWidth}px;
+          height: ${height}px;
+          background: rgba(251, 191, 36, 0.35);
+          border-top: 2px solid rgba(217, 119, 6, 0.8);
+          border-bottom: 2px solid rgba(217, 119, 6, 0.8);
+          pointer-events: none;
+          z-index: 10;
+        `;
+        (pdfContainerRef.current as HTMLElement).style.position = "relative";
+        pdfContainerRef.current!.appendChild(overlay);
+        console.log("[tariff-highlight] Strategy B: overlay at top=", topPx, "height=", height);
       }
+      pendingHighlightRef.current = null;
+      return;
     }
 
     // Group into lines
@@ -755,13 +709,13 @@ export function ResultView({
     pendingHighlightRef.current = null;
   };
 
-  const handleScrollToTariffPage = (pageNumber?: number | null, highlightText?: string, highlightName?: string) => {
+  const handleScrollToTariffPage = (pageNumber?: number | null, highlightText?: string, highlightName?: string, rowTopPct?: number, rowBottomPct?: number) => {
     if (!pageNumber || pageNumber <= 0) return;
     if (!tariffFile) return;
 
     // Cancel any pending highlight
     if (highlightTimerRef.current) clearTimeout(highlightTimerRef.current);
-    pendingHighlightRef.current = { pageNumber, highlightText, highlightName };
+    pendingHighlightRef.current = { pageNumber, highlightText, highlightName, rowTopPct, rowBottomPct };
     highlightAttemptsRef.current = 0;
 
     console.log("[tariff-highlight] scheduling runHighlight, page=", pageNumber, "text=", highlightText, "name=", highlightName);
