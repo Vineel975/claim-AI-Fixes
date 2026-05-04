@@ -1307,6 +1307,9 @@ export function ResultView({
         );
       }
 
+      // Wait for Spectra to process all preceding postMessages before firing claimAISaveComplete
+      await new Promise(resolve => setTimeout(resolve, 800));
+
       // Notify Spectra: save complete — read jobId from URL path /job/{jobId}
       const urlJobId = typeof window !== "undefined"
         ? window.location.pathname.split("/").filter(Boolean).pop() ?? ""
@@ -1580,20 +1583,20 @@ export function ResultView({
                 </div>
                 <div className="mt-4 border-t border-border/80 py-4">
                   <SaveDropdown
-                    onSave={() => {
-                      sendAccommodationToSpectra();
-                      handleSave();
+                    onSave={async () => {
+                      await sendAccommodationToSpectra();
+                      await handleSave();
                     }}
-                    onSaveAndRaiseQuery={() => {
-                      sendAccommodationToSpectra();
-                      handleSave();
+                    onSaveAndRaiseQuery={async () => {
+                      await sendAccommodationToSpectra();
+                      await handleSave();
                       const q = buildQueryMessage();
                       if (q.type) setQueryType(q.type);
                       if (q.message) setQueryMessage(q.message);
                       setIsQueryDialogOpen(true);
                     }}
-                    onDontSaveAndRaiseQuery={() => {
-                      sendAccommodationToSpectra();
+                    onDontSaveAndRaiseQuery={async () => {
+                      await sendAccommodationToSpectra();
                       const q = buildQueryMessage();
                       if (q.type) setQueryType(q.type);
                       if (q.message) setQueryMessage(q.message);
