@@ -1,5 +1,3 @@
-﻿
-
 /*-------------------------------------------------
        ////Code Written By B. Srinu  on 17thDec2015
        ////Description: ClaimUnlock
@@ -1792,33 +1790,13 @@ function HospDetails_SumEstimatedDays(_ctrlRoomDays, _ctrlICUDays, _ctrlTotalDay
             alert('Invalid ICU days');
         }
         else if ($('#' + _ctrlRoomDays).val() != '' && $('#' + _ctrlICUDays).val() != '') {
-            if (totalDays == 0) {
-                $('#' + _ctrlRoomDays).val('');
-                $('#' + _ctrlICUDays).val('');
-                alert('Invalid Room and ICU days');
-            }
-            else {
-                //var totalPlus = totalDays + 1;               
-                //var totalMinus = totalDays - 1;
-
-                if (totalDays > days || totalDays < days - 1) {
-                    $('#' + _ctrlRoomDays).val('');
-                    $('#' + _ctrlICUDays).val('');
-                    alert('Invalid Room and ICU days');
-                }
-                else
-                    $('#' + _ctrlTotalDays).val(totalDays);
-            }
+            // ClaimAI: Room/ICU days validation removed
+            if (totalDays > 0)
+                $('#' + _ctrlTotalDays).val(totalDays);
         }
         else {
-            //var dplus = days + 1;
-            //if (totalDays > dplus) {
-            if (totalDays > days) {
-                $('#' + _ctrlRoomDays).val('');
-                $('#' + _ctrlICUDays).val('');
-                alert('Invalid Room or ICU days');
-            }
-            else
+            // ClaimAI: Room/ICU days validation removed
+            if (totalDays > 0)
                 $('#' + _ctrlTotalDays).val(totalDays);
         }
 
