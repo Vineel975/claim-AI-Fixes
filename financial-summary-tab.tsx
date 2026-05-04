@@ -36,7 +36,7 @@ interface FinancialSummaryTabProps {
   hospitalBillBreakdown?: HospitalBillBreakdownItem[] | null;
   hospitalBillPageNumber?: number | null;
   onHospitalAmountClick?: (pageNumber?: number | null) => void;
-  onTariffAmountClick?: (pageNumber?: number | null, highlightText?: string, highlightName?: string) => void;
+  onTariffAmountClick?: (pageNumber?: number | null, highlightText?: string, highlightName?: string, rowTopPct?: number, rowBottomPct?: number) => void;
   /** Passed from result-view — same claimId used by benefit-plan and patient-info tabs */
   claimId?: string;
   /** MemberPolicyID for previous claims lookup */
@@ -222,7 +222,7 @@ export function FinancialSummaryTab({
   };
 
   // ── Editable breakdown rows ───────────────────────────────────────────────
-  type EditableRow = { id: string; name: string; amount: string; pdfText?: string; pdfPageNumber?: number };
+  type EditableRow = { id: string; name: string; amount: string; pdfText?: string; pdfPageNumber?: number; pdfRowTopPct?: number; pdfRowBottomPct?: number };
 
   const toEditableRows = (items: HospitalBillBreakdownItem[]): EditableRow[] =>
     items.map((item, i) => ({
@@ -238,6 +238,8 @@ export function FinancialSummaryTab({
       amount: item.amount != null ? String(item.amount) : "",
       pdfText: (item as any).pdfText ?? undefined,
       pdfPageNumber: (item as any).pdfPageNumber ?? undefined,
+      pdfRowTopPct: (item as any).pdfRowTopPct ?? undefined,
+      pdfRowBottomPct: (item as any).pdfRowBottomPct ?? undefined,
     }));
 
   const [hospitalRows, setHospitalRows] = useState<EditableRow[]>([]);
@@ -511,7 +513,7 @@ export function FinancialSummaryTab({
                       const page = row.pdfPageNumber ?? tariffPageNumber;
                       const searchText = row.pdfText ?? row.amount;
                       const searchName = row.pdfText ? undefined : row.name;
-                      onTariffAmountClick?.(page, searchText, searchName);
+                      onTariffAmountClick?.(page, searchText, searchName, row.pdfRowTopPct, row.pdfRowBottomPct);
                     }
                   };
                   return (
