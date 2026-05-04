@@ -438,21 +438,33 @@ export function ResultView({
       return;
     }
 
-    // Scroll to page
-    targetWrapper.scrollIntoView({ behavior: "smooth", block: "start" });
+    // Scroll to page — use instant scroll so the page enters viewport immediately,
+    // which triggers react-pdf to render its text layer synchronously.
+    targetWrapper.scrollIntoView({ behavior: "instant" as ScrollBehavior, block: "start" });
 
     if (!highlightText && !highlightName) {
       pendingHighlightRef.current = null;
       return;
     }
 
-    const textLayer = targetWrapper.querySelector(".react-pdf__Page__textContent");
+    // react-pdf lazy-renders text layer only when page is in viewport.
+    // After scrollIntoView, give the browser a moment to render, then search.
+    // Use document-wide query to find spans for this specific page number.
+    const pageEl = targetWrapper.querySelector(`[data-page-number="${pageNumber}"].react-pdf__Page`) 
+                ?? targetWrapper.querySelector(".react-pdf__Page");
+    const textLayer = pageEl
+      ? pageEl.querySelector(".react-pdf__Page__textContent")
+      : targetWrapper.querySelector(".react-pdf__Page__textContent");
+
     const spans = textLayer ? Array.from(textLayer.querySelectorAll("span")) as HTMLElement[] : [];
+    console.log("[tariff-highlight] targetWrapper found, textLayer=", !!textLayer, "spans=", spans.length);
 
     if (spans.length === 0) {
-      if (highlightAttemptsRef.current < 15) {
+      if (highlightAttemptsRef.current < 20) {
         highlightAttemptsRef.current++;
-        highlightTimerRef.current = setTimeout(runHighlight, 400);
+        // Increase delay progressively to give page time to render
+        const delay = Math.min(300 + highlightAttemptsRef.current * 200, 1500);
+        highlightTimerRef.current = setTimeout(runHighlight, delay);
       }
       return;
     }
