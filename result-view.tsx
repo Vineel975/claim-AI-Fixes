@@ -525,10 +525,9 @@ export function ResultView({
     }
 
     // STRATEGY B: pdfjs text content API — for scanned/image PDFs where DOM spans are empty.
-    // Load the PDF directly via pdfjs, get text items with viewport positions,
-    // find the matching text, then draw a highlight overlay div over the canvas.
     if (!highlightName && highlightText && highlightText.length > 5 && tariffFile) {
       const searchWords = normalize(highlightText).split(" ").filter(w => w.length > 3);
+      console.log("[tariff-highlight] Strategy B starting, searchWords=", searchWords, "tariffFile type=", typeof tariffFile);
       if (searchWords.length > 0) {
         (async () => {
           try {
@@ -536,9 +535,12 @@ export function ResultView({
               typeof tariffFile === "string" ? tariffFile : URL.createObjectURL(tariffFile as File)
             );
             const pdf = await loadingTask.promise;
+            console.log("[tariff-highlight] Strategy B: pdf loaded, numPages=", pdf.numPages);
             const page = await pdf.getPage(pageNumber);
             const textContent = await page.getTextContent();
             const viewport = page.getViewport({ scale: 1 });
+            console.log("[tariff-highlight] Strategy B: textContent items=", textContent.items.length,
+              "sample:", (textContent.items as any[]).slice(0,3).map((i:any) => i.str));
 
             // Find best matching text item
             let bestItem: any = null;
@@ -550,6 +552,7 @@ export function ResultView({
               if (hits > bestHits) { bestHits = hits; bestItem = item; }
             }
 
+            console.log("[tariff-highlight] Strategy B: bestHits=", bestHits, "bestItem=", bestItem?.str, "threshold=", Math.min(2, searchWords.length));
             if (!bestItem || bestHits < Math.min(2, searchWords.length)) return;
 
             // Get the canvas element for this page to compute overlay position
@@ -598,6 +601,10 @@ export function ResultView({
             // Container must be position:relative for absolute child to work
             (pdfContainerRef.current as HTMLElement).style.position = "relative";
             pdfContainerRef.current!.appendChild(overlay);
+            console.log("[tariff-highlight] Strategy B: overlay appended at",
+              overlay.style.left, overlay.style.top, "size", overlay.style.width, overlay.style.height,
+              "canvas rect:", canvasRect, "canvasOffsetTop:", canvasOffsetTop,
+              "pdfScale:", pdfScale, "bestItem transform:", bestItem.transform);
           } catch (e) {
             console.warn("[tariff-highlight] Strategy B failed:", e);
           }
