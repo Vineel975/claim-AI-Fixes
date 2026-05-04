@@ -33,6 +33,16 @@ export const tariffBreakdownItemSchema = z.object({
     .describe(
       "The TARIFF PDF page number (1-based) where this specific tariff item/row appears.",
     ),
+  pdfRowTopPct: z
+    .number()
+    .describe(
+      "Approximate vertical position of the TOP of this tariff row as a percentage of the page height (0 = top of page, 100 = bottom). Estimate visually from the PDF. For example, if the row is roughly 60% down the page, return 60.",
+    ),
+  pdfRowBottomPct: z
+    .number()
+    .describe(
+      "Approximate vertical position of the BOTTOM of this tariff row as a percentage of the page height (0 = top, 100 = bottom). Usually pdfRowTopPct + 2 to 4 for a single-line row.",
+    ),
 });
 
 export const hospitalSummaryItemSchema = z.object({
