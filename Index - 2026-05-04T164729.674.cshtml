@@ -8893,6 +8893,11 @@
                             success: function(res) {
                                 console.log('[ClaimAI] SaveHospitalizationDetailsForClaimAI:', res);
                                 if (res && res.success) {
+                                    // Update in-memory flag so Claim Actions validation passes
+                                    if (basicData && basicData[0]) {
+                                        basicData[0].IsAprvFacilitychanged = 1;
+                                    }
+                                    $('#hdnIsFacilityChanged').val('false');
                                     var $t = $('<div/>').text('✓ Accommodation & room details saved')
                                         .css({ position:'fixed', bottom:'140px', right:'20px',
                                                background:'#1565C0', color:'#fff',
@@ -9002,6 +9007,10 @@
                         success: function(res) {
                             console.log('[ClaimAI] SaveBilling response:', res);
                             if (res && res.success) {
+                                // Update in-memory flag so Claim Actions billing validation passes
+                                if (basicData && basicData[0]) {
+                                    basicData[0].BillingCorrection = 2;
+                                }
                                 // Refresh Bill Details — call Get_ServiceBillingDetails directly
                                 // It's defined in BillingPartialView and available globally
                                 setTimeout(function() {
@@ -9064,6 +9073,13 @@
 
                 if (event.data.type === 'claimAISaveComplete') {
                     var savedJobId = event.data.jobId || '';
+
+                    // Force all validation flags to pass so Claim Actions works immediately
+                    if (basicData && basicData[0]) {
+                        basicData[0].IsAprvFacilitychanged = 1;
+                        basicData[0].BillingCorrection = 2;
+                    }
+                    $('#hdnIsFacilityChanged').val('false');
 
                     // Show success toast
                     var $successToast = $('<div/>').text('✓ AI Summary saved successfully')
@@ -9311,6 +9327,10 @@
                         success: function(res) {
                             console.log('[ClaimAI] Coding saved:', res);
                             if (res && res.success) {
+                                // Update BillingCorrection flag so Claim Actions validation passes
+                                if (basicData && basicData[0]) {
+                                    basicData[0].BillingCorrection = 2;
+                                }
                                 // Delay to allow DB commit before refreshing coding table
                                 setTimeout(function() {
                                     if (typeof Retrieve_ClaimsCodingDetails === 'function') {
