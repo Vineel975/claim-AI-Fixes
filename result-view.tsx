@@ -420,6 +420,8 @@ export function ResultView({
 
     // Find wrapper
     const wrappers = pdfContainerRef.current.querySelectorAll("[data-page-number]");
+    console.log("[tariff-highlight] wrappers found=", wrappers.length,
+      "innerHTML snippet=", pdfContainerRef.current.innerHTML.slice(0, 300));
     let targetWrapper: HTMLElement | null = null;
     for (const el of Array.from(wrappers)) {
       if (parseInt((el as HTMLElement).getAttribute("data-page-number") || "0") === pageNumber) {
