@@ -9074,13 +9074,14 @@
                                zIndex: 99999, boxShadow: '0 3px 10px rgba(0,0,0,0.3)' })
                         .appendTo('body');
 
+                    // Store jobId so AI summary is restored on next page load
+                    if (savedJobId) {
+                        sessionStorage.setItem('claimAI_jobId', savedJobId);
+                        sessionStorage.setItem('claimAI_claimId', $('#hdnClaimID').val());
+                    }
+                    // Don't reload — all data saved via AJAX already. Just fade toast.
                     setTimeout(function() {
-                        if (savedJobId) {
-                            sessionStorage.setItem('claimAI_jobId', savedJobId);
-                            sessionStorage.setItem('claimAI_claimId', $('#hdnClaimID').val());
-                        }
                         $successToast.fadeOut(300, function() { $successToast.remove(); });
-                        window.location.reload();
                     }, 2000);
 
                     // Collapse AI summary widget immediately
