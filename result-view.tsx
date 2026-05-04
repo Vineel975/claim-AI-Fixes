@@ -385,14 +385,29 @@ export function ResultView({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const handleScrollToTariffPage = (pageNumber?: number | null, highlightText?: string, highlightName?: string) => {
-    console.log("[tariff-highlight] click: pageNumber=", pageNumber, "tariffFile=", !!tariffFile, "pdfContainerRef=", !!pdfContainerRef.current);
-    if (!pdfContainerRef.current || !pageNumber || pageNumber <= 0) return;
-    if (!tariffFile) return;
+  // Pending highlight request — survives re-renders caused by setActivePdfFile
+  const pendingHighlightRef = useRef<{ pageNumber: number; highlightText?: string; highlightName?: string } | null>(null);
+  const highlightAttemptsRef = useRef(0);
+  const highlightTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-    setActivePdfFile("tariff");
+  const runHighlight = () => {
+    const req = pendingHighlightRef.current;
+    if (!req || !pdfContainerRef.current) return;
 
-    const clearHighlights = clearTariffHighlights;
+    const { pageNumber, highlightText, highlightName } = req;
+
+    const normalize = (s: string) => s.replace(/[,\s]+/g, " ").trim().toLowerCase();
+
+    const getSpanTopPx = (span: HTMLElement): number | null => {
+      const top = span.style.top;
+      if (top) {
+        const calcMatch = top.match(/\*\s*([\d.]+)px/);
+        if (calcMatch) return parseFloat(calcMatch[1]);
+        if (top.endsWith("px")) return parseFloat(top);
+        if (top.endsWith("%")) return parseFloat(top);
+      }
+      return null;
+    };
 
     const applyHighlight = (span: HTMLElement) => {
       span.classList.add("tariff-highlight");
@@ -402,204 +417,124 @@ export function ResultView({
       span.style.mixBlendMode = "multiply";
     };
 
-    const normalize = (s: string) =>
-      s.replace(/[,\s]+/g, " ").trim().toLowerCase();
-
-    // react-pdf renders spans with top as: calc(var(--total-scale-factor) * 705.85px)
-    // Extract the raw px number from that expression for row comparison.
-    const getSpanTopPx = (span: HTMLElement): number | null => {
-      const top = span.style.top;
-      if (top) {
-        // calc(var(--total-scale-factor) * 123.45px)
-        const calcMatch = top.match(/\*\s*([\d.]+)px/);
-        if (calcMatch) return parseFloat(calcMatch[1]);
-        // plain px
-        if (top.endsWith("px")) return parseFloat(top);
-        // plain %
-        if (top.endsWith("%")) return parseFloat(top);
+    // Find wrapper
+    const wrappers = pdfContainerRef.current.querySelectorAll("[data-page-number]");
+    let targetWrapper: HTMLElement | null = null;
+    for (const el of Array.from(wrappers)) {
+      if (parseInt((el as HTMLElement).getAttribute("data-page-number") || "0") === pageNumber) {
+        targetWrapper = el as HTMLElement;
+        break;
       }
-      return null; // span has no meaningful position — skip it
-    };
+    }
 
-    const doHighlight = (wrapper: HTMLElement) => {
-      clearHighlights();
-      wrapper.scrollIntoView({ behavior: "smooth", block: "start" });
-
-      // If no highlight text/name provided, just scroll — don't attempt matching
-      if (!highlightText && !highlightName) return;
-
-      const textLayer = wrapper.querySelector(".react-pdf__Page__textContent");
-      if (!textLayer) return;
-
-      const spans = Array.from(textLayer.querySelectorAll("span")) as HTMLElement[];
-      if (spans.length === 0) return;
-
-      const normName   = highlightName ? normalize(highlightName) : "";
-      const normAmount = highlightText ? normalize(String(highlightText)) : "";
-      const amountDigits = normAmount.replace(/[^0-9]/g, "");
-
-      // Name words — filter out short/generic words
-      const nameWords = normName.split(" ").filter(w => w.length > 3);
-
-      // Step 1: find anchor span — prefer name match, fallback to amount
-      let anchorSpan: HTMLElement | null = null;
-
-      console.log("[tariff-highlight] doHighlight: total spans=", spans.length, "highlightText=", highlightText, "highlightName=", highlightName);
-
-      // Only consider spans that have a real position (style.top with calc/px)
-      const positionedSpans = spans.filter(s => getSpanTopPx(s) !== null);
-      console.log("[tariff-highlight] positioned spans=", positionedSpans.length);
-      if (positionedSpans.length > 0) {
-        console.log("[tariff-highlight] sample span style.top:", positionedSpans[0].style.top, "text:", positionedSpans[0].textContent?.slice(0, 40));
+    if (!targetWrapper) {
+      if (highlightAttemptsRef.current < 15) {
+        highlightAttemptsRef.current++;
+        highlightTimerRef.current = setTimeout(runHighlight, 400);
       }
+      return;
+    }
 
-      // Group positioned spans by line (top ±2px) into a map: topPx -> spans[]
-      const lineMap = new Map<number, HTMLElement[]>();
-      for (const span of positionedSpans) {
-        const t = getSpanTopPx(span)!;
-        const existing = [...lineMap.keys()].find(k => Math.abs(k - t) <= 2);
-        if (existing !== undefined) {
-          lineMap.get(existing)!.push(span);
-        } else {
-          lineMap.set(t, [span]);
-        }
+    // Scroll to page
+    targetWrapper.scrollIntoView({ behavior: "smooth", block: "start" });
+
+    if (!highlightText && !highlightName) {
+      pendingHighlightRef.current = null;
+      return;
+    }
+
+    const textLayer = targetWrapper.querySelector(".react-pdf__Page__textContent");
+    const spans = textLayer ? Array.from(textLayer.querySelectorAll("span")) as HTMLElement[] : [];
+
+    if (spans.length === 0) {
+      if (highlightAttemptsRef.current < 15) {
+        highlightAttemptsRef.current++;
+        highlightTimerRef.current = setTimeout(runHighlight, 400);
       }
+      return;
+    }
 
-      // Score each line: count how many name words appear in the full line text
-      // Also bonus if the line contains the exact amount digits
-      let bestScore = -1;
-      let bestLineTop: number | null = null;
+    // Clear old highlights
+    clearTariffHighlights();
 
+    const normName    = highlightName ? normalize(highlightName) : "";
+    const normAmount  = highlightText ? normalize(String(highlightText)) : "";
+    const amountDigits = normAmount.replace(/[^0-9]/g, "");
+    const nameWords   = normName.split(" ").filter(w => w.length > 3);
+
+    const positionedSpans = spans.filter(s => getSpanTopPx(s) !== null);
+
+    // Group into lines
+    const lineMap = new Map<number, HTMLElement[]>();
+    for (const span of positionedSpans) {
+      const t = getSpanTopPx(span)!;
+      const existing = [...lineMap.keys()].find(k => Math.abs(k - t) <= 2);
+      if (existing !== undefined) lineMap.get(existing)!.push(span);
+      else lineMap.set(t, [span]);
+    }
+
+    // Score each line
+    let bestScore = -1;
+    let bestLineTop: number | null = null;
+    for (const [topPx, lineSpans] of lineMap) {
+      const lineText   = normalize(lineSpans.map(s => s.textContent || "").join(" "));
+      const lineDigits = lineText.replace(/[^0-9]/g, "");
+      let score = 0;
+      for (const w of nameWords) { if (lineText.includes(w)) score += 2; }
+      if (amountDigits && lineDigits.includes(amountDigits)) score += 3;
+      if (lineText.length < 5) score -= 2;
+      if (score > bestScore) { bestScore = score; bestLineTop = topPx; }
+    }
+
+    if ((bestScore <= 0 || bestLineTop === null) && amountDigits.length > 0) {
       for (const [topPx, lineSpans] of lineMap) {
-        const lineText = normalize(lineSpans.map(s => s.textContent || "").join(" "));
-        const lineDigits = lineText.replace(/[^0-9]/g, "");
-
-        let score = 0;
-        // Each name word that appears in the line text adds to score
-        for (const w of nameWords) {
-          if (lineText.includes(w)) score += 2;
-        }
-        // Exact amount match is a strong signal
-        if (amountDigits && lineDigits.includes(amountDigits)) score += 3;
-        // Penalise very short lines (likely header/label cells, not data rows)
-        if (lineText.length < 5) score -= 2;
-
-        if (score > bestScore) {
-          bestScore = score;
-          bestLineTop = topPx;
-        }
+        const lineDigits = lineSpans.map(s => s.textContent || "").join("").replace(/[^0-9]/g, "");
+        if (lineDigits.includes(amountDigits)) { bestLineTop = topPx; break; }
       }
+    }
 
-      // Fallback: match purely by amount if no name match found
-      if ((bestScore <= 0 || bestLineTop === null) && amountDigits.length > 0) {
-        for (const [topPx, lineSpans] of lineMap) {
-          const lineDigits = lineSpans.map(s => s.textContent || "").join("").replace(/[^0-9]/g, "");
-          if (lineDigits.includes(amountDigits)) {
-            bestLineTop = topPx;
-            break;
-          }
-        }
-      }
+    if (bestLineTop === null) { pendingHighlightRef.current = null; return; }
 
-      if (bestLineTop === null) return;
-      // Set anchorSpan to first span on the best line (for row detection below)
-      anchorSpan = lineMap.get([...lineMap.keys()].find(k => Math.abs(k - bestLineTop!) <= 2)!)![0];
+    const anchorSpan = lineMap.get([...lineMap.keys()].find(k => Math.abs(k - bestLineTop!) <= 2)!)![0];
+    const anchorTop  = getSpanTopPx(anchorSpan);
+    if (anchorTop === null) { pendingHighlightRef.current = null; return; }
 
-      if (!anchorSpan) return;
+    const topValues = [...lineMap.keys()].sort((a, b) => a - b);
+    const anchorLineIdx = topValues.findIndex(v => Math.abs(v - anchorTop) <= 2);
+    if (anchorLineIdx === -1) { pendingHighlightRef.current = null; return; }
 
-      const anchorTop = getSpanTopPx(anchorSpan);
-      if (anchorTop === null) return;
+    const linesToHighlight = new Set<number>();
+    linesToHighlight.add(anchorLineIdx);
+    const nextIdx = anchorLineIdx + 1;
+    if (nextIdx < topValues.length) {
+      const gap = Math.abs(topValues[nextIdx] - anchorTop);
+      const nextSpans = spans.filter(s => { const t = getSpanTopPx(s); return t !== null && Math.abs(t - topValues[nextIdx]) <= 2; });
+      const nextText  = nextSpans.map(s => s.textContent || "").join("").trim();
+      if (gap < 12 && !/\d{3,}/.test(nextText)) linesToHighlight.add(nextIdx);
+    }
 
-      // DEBUG
-      console.log("[highlight] all line tops:", [...lineMap.keys()].sort((a,b)=>a-b));
-      console.log("[highlight] anchorTop:", anchorTop, "bestScore:", bestScore);
-      console.log("[highlight] total positioned spans:", positionedSpans.length, "/ total spans:", spans.length);
-      console.log("[highlight] lineMap size:", lineMap.size, "lines");
+    spans.forEach(span => {
+      const t = getSpanTopPx(span);
+      if (t === null) return;
+      const lineIdx = topValues.findIndex(v => Math.abs(v - t) <= 2);
+      if (linesToHighlight.has(lineIdx)) applyHighlight(span);
+    });
 
-      // A tariff table row can have a multi-line description.
-      // We find all positioned spans, group them by top value into visual lines,
-      // then find which line(s) the anchor belongs to and also include the
-      // immediately adjacent line if it's part of the same wrapped description.
+    pendingHighlightRef.current = null;
+  };
 
-      // Step 1: collect all unique top values (lines)
-      const topValues: number[] = [];
-      spans.forEach(span => {
-        const t = getSpanTopPx(span);
-        if (t === null) return;
-        if (!topValues.some(v => Math.abs(v - t) <= 2)) topValues.push(t);
-      });
-      topValues.sort((a, b) => a - b);
+  const handleScrollToTariffPage = (pageNumber?: number | null, highlightText?: string, highlightName?: string) => {
+    if (!pageNumber || pageNumber <= 0) return;
+    if (!tariffFile) return;
 
-      // Step 2: find which line index the anchor is on
-      const anchorLineIdx = topValues.findIndex(v => Math.abs(v - anchorTop) <= 2);
-      if (anchorLineIdx === -1) return;
+    // Cancel any pending highlight
+    if (highlightTimerRef.current) clearTimeout(highlightTimerRef.current);
+    pendingHighlightRef.current = { pageNumber, highlightText, highlightName };
+    highlightAttemptsRef.current = 0;
 
-      // Step 3: only include the anchor line.
-      // For wrapped descriptions, the continuation line contains ONLY text (no numbers).
-      // Include it only if: gap to next line is small (<12px) AND the next line has no digits.
-      const linesToHighlight = new Set<number>();
-      linesToHighlight.add(anchorLineIdx);
-
-      const nextIdx = anchorLineIdx + 1;
-      if (nextIdx < topValues.length) {
-        const gap = Math.abs(topValues[nextIdx] - anchorTop);
-        const nextLineSpans = spans.filter(s => {
-          const t = getSpanTopPx(s);
-          return t !== null && Math.abs(t - topValues[nextIdx]) <= 2;
-        });
-        const nextLineText = nextLineSpans.map(s => s.textContent || "").join("").trim();
-        const nextLineHasNumbers = /\d{3,}/.test(nextLineText); // 3+ digit number = amount col
-        // Only include as continuation if gap is small AND no amounts on next line
-        if (gap < 12 && !nextLineHasNumbers) {
-          linesToHighlight.add(nextIdx);
-        }
-      }
-
-      // Step 4: highlight all spans on those lines
-      spans.forEach(span => {
-        const t = getSpanTopPx(span);
-        if (t === null) return;
-        const lineIdx = topValues.findIndex(v => Math.abs(v - t) <= 2);
-        if (linesToHighlight.has(lineIdx)) {
-          applyHighlight(span);
-        }
-      });
-    };
-
-    // Wait for the tariff tab to switch and PDF page to render, then highlight
-    const tryHighlight = (attemptsLeft: number) => {
-      setTimeout(() => {
-        if (!pdfContainerRef.current) return;
-
-        const wrappers = pdfContainerRef.current.querySelectorAll("[data-page-number]");
-        let targetWrapper: HTMLElement | null = null;
-        for (const el of Array.from(wrappers)) {
-          if (parseInt((el as HTMLElement).getAttribute("data-page-number") || "0") === pageNumber) {
-            targetWrapper = el as HTMLElement;
-            break;
-          }
-        }
-
-        if (!targetWrapper) {
-          if (attemptsLeft > 0) tryHighlight(attemptsLeft - 1);
-          return;
-        }
-
-        const textLayer = targetWrapper.querySelector(".react-pdf__Page__textContent");
-        const spans = textLayer ? textLayer.querySelectorAll("span") : [];
-
-        // If no highlight needed, scroll immediately regardless of text layer
-        if (!highlightText && !highlightName) {
-          doHighlight(targetWrapper);
-        } else if (spans.length > 0) {
-          doHighlight(targetWrapper);
-        } else if (attemptsLeft > 0) {
-          tryHighlight(attemptsLeft - 1);
-        }
-      }, 400);
-    };
-
-    tryHighlight(10);
+    setActivePdfFile("tariff");
+    // Start after tab switch renders
+    highlightTimerRef.current = setTimeout(runHighlight, 300);
   };
 
   const formatAmountValue = (amount?: number | null) => {
