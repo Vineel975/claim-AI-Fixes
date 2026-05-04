@@ -473,50 +473,85 @@ export function ResultView({
       else lineMap.set(t, [span]);
     }
 
-    // DEBUG: log all lines with their text and top values
-    console.log("[tariff-highlight] lineMap size:", lineMap.size);
-    const sortedLines = [...lineMap.entries()].sort((a,b) => a[0]-b[0]);
-    sortedLines.forEach(([top, lineSpans]) => {
-      const txt = lineSpans.map(s => s.textContent||"").join("|");
-      console.log(`  line top=${top.toFixed(1)} text="${txt.slice(0,80)}"`);
-    });
-    console.log("[tariff-highlight] searching for name:", normName, "amount:", amountDigits);
+    // Detect "column layout" PDFs (Excel-converted) where all amounts are on one line
+    // and all names are on another separate line. In this case we match by index position.
+    const allLines = [...lineMap.entries()]
+      .map(([top, lineSpans]) => ({
+        top,
+        spans: lineSpans,
+        text: normalize(lineSpans.map(s => s.textContent || "").join(" ")),
+        rawSpans: lineSpans,
+      }))
+      .filter(l => l.text.trim().length > 0)
+      .sort((a, b) => a.top - b.top);
 
-    // Score each line — must score above threshold to be highlighted
+    // Check if this is a column-layout PDF:
+    // One line has mostly numbers, another has mostly text (procedure names)
+    const amountsLine = allLines.find(l => {
+      const digits = l.text.replace(/[^0-9]/g, "");
+      const nonDigits = l.text.replace(/[0-9\s|,]/g, "");
+      return digits.length > nonDigits.length && l.rawSpans.length >= 3;
+    });
+    const namesLine = allLines.find(l => {
+      const nonDigits = l.text.replace(/[0-9\s|,]/g, "");
+      const digits = l.text.replace(/[^0-9]/g, "");
+      return nonDigits.length > digits.length && l.rawSpans.length >= 3;
+    });
+
+    if (amountsLine && namesLine && amountsLine !== namesLine) {
+      // Column layout — find index of target amount in amounts line
+      // then highlight the span at the same index in names line
+      const amountSpans = amountsLine.rawSpans;
+      let amountIdx = -1;
+      for (let i = 0; i < amountSpans.length; i++) {
+        const spanDigits = (amountSpans[i].textContent || "").replace(/[^0-9]/g, "");
+        if (spanDigits === amountDigits) { amountIdx = i; break; }
+      }
+
+      // Find name span by matching name words
+      const nameSpans = namesLine.rawSpans;
+      let nameIdx = -1;
+      if (nameWords.length > 0) {
+        let bestHits = 0;
+        for (let i = 0; i < nameSpans.length; i++) {
+          const t = normalize(nameSpans[i].textContent || "");
+          const hits = nameWords.filter(w => t.includes(w)).length;
+          if (hits > bestHits) { bestHits = hits; nameIdx = i; }
+        }
+      }
+      // Fallback to same index as amount
+      if (nameIdx === -1 && amountIdx !== -1) nameIdx = amountIdx;
+
+      // Highlight matched name span and its corresponding amount span
+      if (nameIdx !== -1 && nameIdx < nameSpans.length) applyHighlight(nameSpans[nameIdx]);
+      if (amountIdx !== -1 && amountIdx < amountSpans.length) applyHighlight(amountSpans[amountIdx]);
+
+      pendingHighlightRef.current = null;
+      return;
+    }
+
+    // Standard layout — score each line normally
     type LineScoredEntry = { topPx: number; score: number; nameHits: number; exactAmount: boolean };
     const scored: LineScoredEntry[] = [];
 
-    for (const [topPx, lineSpans] of lineMap) {
-      const lineText    = normalize(lineSpans.map(s => s.textContent || "").join(" "));
+    for (const { top: topPx, text: lineText } of allLines) {
       const lineDigits  = lineText.replace(/[^0-9]/g, "");
-      if (lineText.length < 3) continue; // skip blank/tiny lines
-
       let nameHits = 0;
       for (const w of nameWords) { if (lineText.includes(w)) nameHits++; }
-
-      // Exact amount match: digits on this line equal the target amount digits exactly
       const exactAmount = amountDigits.length > 0 && lineDigits === amountDigits;
-      // Loose amount match: line contains the amount digits somewhere
       const looseAmount = amountDigits.length > 0 && lineDigits.includes(amountDigits);
-
       const score = (nameHits * 2) + (exactAmount ? 5 : looseAmount ? 1 : 0);
       scored.push({ topPx, score, nameHits, exactAmount });
     }
 
-    // Sort by score descending
     scored.sort((a, b) => b.score - a.score);
-
-    // Best candidate: highest score, must have at least 1 name hit OR exact amount
     const best = scored[0];
     if (!best || (best.nameHits === 0 && !best.exactAmount)) {
-      // Last resort: find line whose digits exactly equal amountDigits
       if (amountDigits.length > 0) {
         const exactLine = scored.find(s => s.exactAmount);
         if (!exactLine) { pendingHighlightRef.current = null; return; }
         var bestLineTop: number | null = exactLine.topPx;
-      } else {
-        pendingHighlightRef.current = null; return;
-      }
+      } else { pendingHighlightRef.current = null; return; }
     } else {
       var bestLineTop: number | null = best.topPx;
     }
@@ -531,7 +566,6 @@ export function ResultView({
     const anchorLineIdx = topValues.findIndex(v => Math.abs(v - anchorTop) <= 2);
     if (anchorLineIdx === -1) { pendingHighlightRef.current = null; return; }
 
-    // Only highlight anchor line + next line if it's a pure text-wrap (no digits, small gap)
     const linesToHighlight = new Set<number>();
     linesToHighlight.add(anchorLineIdx);
     const nextIdx = anchorLineIdx + 1;
@@ -539,7 +573,6 @@ export function ResultView({
       const gap       = Math.abs(topValues[nextIdx] - anchorTop);
       const nextSpans = spans.filter(s => { const t = getSpanTopPx(s); return t !== null && Math.abs(t - topValues[nextIdx]) <= 2; });
       const nextText  = nextSpans.map(s => s.textContent || "").join("").trim();
-      // Only include next line if gap is tiny AND it has no numbers (pure text continuation)
       if (gap < 10 && !/[0-9]/.test(nextText)) linesToHighlight.add(nextIdx);
     }
 
