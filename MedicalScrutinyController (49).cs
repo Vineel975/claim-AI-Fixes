@@ -9400,6 +9400,69 @@ namespace Enrollment.Controllers
         /// GET /MedicalScrutiny/GetBSIForClaimAI?claimId=xxx
         /// </summary>
         [HttpGet]
+        /// <summary>
+        /// GET /MedicalScrutiny/IsClaimAISummaryAllowed?claimId=xxx&slNo=1
+        /// Checks Claimsdetails directly — returns allowed=true only if
+        /// ClaimTypeID=1 AND RequestTypeID=1.
+        /// </summary>
+        [HttpGet]
+        public ActionResult IsClaimAISummaryAllowed(string claimId = null, string slNo = null)
+        {
+            try
+            {
+                long claimIdLong;
+                int slNoInt;
+                if (!long.TryParse((claimId ?? "").Trim(), out claimIdLong) || claimIdLong <= 0)
+                    return Json(new { allowed = false, reason = "Invalid ClaimID" }, JsonRequestBehavior.AllowGet);
+                if (!int.TryParse((slNo ?? "1").Trim(), out slNoInt)) slNoInt = 1;
+
+                string connStr = System.Configuration.ConfigurationManager
+                                       .ConnectionStrings["McarePlusEntities"].ConnectionString;
+                if (connStr.StartsWith("metadata=", StringComparison.OrdinalIgnoreCase))
+                {
+                    var m = System.Text.RegularExpressions.Regex.Match(
+                        connStr, @"provider connection string=""([^""]+)""",
+                        System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                    if (m.Success) connStr = m.Groups[1].Value.Replace("&quot;", """);
+                }
+
+                int claimTypeId = 0, requestTypeId = 0;
+                using (var conn = new System.Data.SqlClient.SqlConnection(connStr))
+                {
+                    conn.Open();
+                    var cmd = conn.CreateCommand();
+                    cmd.CommandText = @"
+                        SELECT TOP 1 ClaimTypeID, RequestTypeID
+                        FROM   Claimsdetails
+                        WHERE  ClaimID = @ClaimID
+                          AND  Slno    = @SlNo
+                          AND  ISNULL(Deleted, 0) = 0";
+                    cmd.Parameters.AddWithValue("@ClaimID", claimIdLong);
+                    cmd.Parameters.AddWithValue("@SlNo",    slNoInt);
+                    using (var rdr = cmd.ExecuteReader())
+                    {
+                        if (rdr.Read())
+                        {
+                            claimTypeId   = rdr["ClaimTypeID"]   == DBNull.Value ? 0 : Convert.ToInt32(rdr["ClaimTypeID"]);
+                            requestTypeId = rdr["RequestTypeID"] == DBNull.Value ? 0 : Convert.ToInt32(rdr["RequestTypeID"]);
+                        }
+                    }
+                }
+
+                bool allowed = (claimTypeId == 1 && requestTypeId == 1);
+                return Json(new {
+                    allowed       = allowed,
+                    claimTypeId   = claimTypeId,
+                    requestTypeId = requestTypeId,
+                    reason        = allowed ? "OK" : $"ClaimTypeID={claimTypeId}, RequestTypeID={requestTypeId} — AI Summary requires both = 1"
+                }, JsonRequestBehavior.AllowGet);
+            }
+            catch (Exception ex)
+            {
+                return Json(new { allowed = false, reason = ex.Message }, JsonRequestBehavior.AllowGet);
+            }
+        }
+
         public ActionResult GetBSIForClaimAI(string claimId)
         {
             // Allow ClaimAI's Next.js server to call this endpoint (URL from Web.config ClaimAIUrl)
