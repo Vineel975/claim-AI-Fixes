@@ -1,4 +1,4 @@
-﻿@{
+@{
     ViewBag.TitleDepartment = "Claims";
     ViewBag.Title = "Claim";
     Layout = "~/Views/Shared/_Layout.cshtml";
@@ -7192,14 +7192,25 @@
          * ═══════════════════════════════════════════════════════════════════
          */
         function InitAiSummary(claimID, slNo) {
-            // Restriction: only allow for ClaimTypeID=1 AND RequestTypeID=1
-            var _aiClaimTypeId   = parseInt($('#hdnClaimTypeID').val()  || '0');
-            var _aiRequestTypeId = parseInt($('#hdnRequestTypeID').val() || '0');
-            if (_aiClaimTypeId !== 1 || _aiRequestTypeId !== 1) {
-                showAiError('AI Summary is only available for Cashless Initial claims (ClaimType=1, RequestType=1). This claim does not qualify.');
-                return;
-            }
+            // Check Claimsdetails directly before starting
+            $.ajax({
+                url:  '/MedicalScrutiny/IsClaimAISummaryAllowed',
+                type: 'GET',
+                data: { claimId: claimID, slNo: slNo },
+                success: function(res) {
+                    if (!res.allowed) {
+                        showAiError('AI Summary not available: ' + res.reason);
+                        return;
+                    }
+                    _doInitAiSummary(claimID, slNo);
+                },
+                error: function() {
+                    _doInitAiSummary(claimID, slNo); // allow on error to avoid blocking
+                }
+            });
+        }
 
+        function _doInitAiSummary(claimID, slNo) {
             console.log('[ClaimAI] STEP 1 START: InitAiSummary. claimID:', claimID, 'slNo:', slNo, 'ClaimAI URL:', _claimAiUrl);
             showAiStatus('Loading medical bill...');
 
@@ -8688,29 +8699,35 @@
             }
 
             // ── ClaimAI AI Summary restriction ──────────────────────────────────────
-            // Only allow AI Summary for ClaimTypeID=1 AND RequestTypeID=1.
+            // Queries Claimsdetails directly — allowed only if ClaimTypeID=1 AND RequestTypeID=1.
             function claimAI_applyRestriction() {
-                var claimTypeId   = parseInt($('#hdnClaimTypeID').val()  || '0');
-                var requestTypeId = parseInt($('#hdnRequestTypeID').val() || '0');
-                var allowed = (claimTypeId === 1 && requestTypeId === 1);
+                var claimId = $('#hdnClaimID').val();
+                var slNo    = $('#hdnClaimSlNo').val();
+                if (!claimId) return;
 
-                // The AI button is .lnkCashlessLog in BillCalculationPartial (divBillcalculation)
-                var $aiBtn = $('#divBillcalculation .lnkCashlessLog, #divBillcalculation a[title="Automation"]');
-                if ($aiBtn.length === 0) $aiBtn = $('.lnkCashlessLog').filter(':visible').last();
+                $.ajax({
+                    url:  '/MedicalScrutiny/IsClaimAISummaryAllowed',
+                    type: 'GET',
+                    data: { claimId: claimId, slNo: slNo },
+                    success: function(res) {
+                        console.log('[ClaimAI] Restriction check:', res);
+                        var $aiBtn = $('#divBillcalculation .lnkCashlessLog');
+                        if ($aiBtn.length === 0) $aiBtn = $('.lnkCashlessLog').last();
 
-                if (allowed) {
-                    $aiBtn.css({ opacity: '', pointerEvents: '', cursor: '' })
-                          .attr('title', 'AI Summary');
-                } else {
-                    // Disable button visually
-                    $aiBtn.css({ opacity: '0.35', pointerEvents: 'none', cursor: 'not-allowed' })
-                          .attr('title', 'AI Summary is only available for Cashless Initial claims (ClaimType=1, RequestType=1)');
-                    // Close widget if open
-                    $('#ifrClaimAI').hide().attr('src', '');
-                    window._claimAI_jobId = null;
-                }
-
-                console.log('[ClaimAI] Restriction check: ClaimTypeID=' + claimTypeId + ' RequestTypeID=' + requestTypeId + ' allowed=' + allowed);
+                        if (res.allowed) {
+                            $aiBtn.css({ opacity: '', pointerEvents: '', cursor: '' })
+                                  .attr('title', 'AI Summary');
+                        } else {
+                            $aiBtn.css({ opacity: '0.35', pointerEvents: 'none', cursor: 'not-allowed' })
+                                  .attr('title', 'AI Summary not available: ' + res.reason);
+                            $('#ifrClaimAI').hide().attr('src', '');
+                            window._claimAI_jobId = null;
+                        }
+                    },
+                    error: function() {
+                        console.warn('[ClaimAI] IsClaimAISummaryAllowed check failed');
+                    }
+                });
             }
 
             // Listen for postMessage from ClaimAI iframe
