@@ -116,7 +116,7 @@ function normalizeAmount(value: unknown): number {
 }
 
 function normalizeTariffBreakdown(
-  breakdown: Array<{ code?: unknown; name?: unknown; amount?: unknown; pdfText?: unknown; pdfPageNumber?: unknown }> | undefined,
+  breakdown: Array<{ code?: unknown; name?: unknown; amount?: unknown; pdfText?: unknown; pdfPageNumber?: unknown; pdfRowTopPct?: unknown; pdfRowBottomPct?: unknown }> | undefined,
 ): TariffBreakdownItem[] {
   return (breakdown || [])
     .map((item) => {
@@ -125,7 +125,9 @@ function normalizeTariffBreakdown(
       const amount = normalizeAmount(item?.amount);
       const pdfText = typeof item?.pdfText === "string" ? item.pdfText.trim() : "";
       const pdfPageNumber = typeof item?.pdfPageNumber === "number" ? item.pdfPageNumber : 0;
-      return { code, name, amount, pdfText, pdfPageNumber };
+      const pdfRowTopPct = typeof item?.pdfRowTopPct === "number" ? item.pdfRowTopPct : 0;
+      const pdfRowBottomPct = typeof item?.pdfRowBottomPct === "number" ? item.pdfRowBottomPct : 0;
+      return { code, name, amount, pdfText, pdfPageNumber, pdfRowTopPct, pdfRowBottomPct };
     })
     .filter((item) => item.amount >= 0);
 }
