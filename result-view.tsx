@@ -392,6 +392,7 @@ export function ResultView({
 
   const runHighlight = () => {
     const req = pendingHighlightRef.current;
+    console.log("[tariff-highlight] runHighlight called, req=", req, "pdfContainerRef=", !!pdfContainerRef.current);
     if (!req || !pdfContainerRef.current) return;
 
     const { pageNumber, highlightText, highlightName } = req;
@@ -659,9 +660,13 @@ export function ResultView({
     pendingHighlightRef.current = { pageNumber, highlightText, highlightName };
     highlightAttemptsRef.current = 0;
 
+    console.log("[tariff-highlight] scheduling runHighlight, page=", pageNumber, "text=", highlightText, "name=", highlightName);
     setActivePdfFile("tariff");
     // Start after tab switch renders
-    highlightTimerRef.current = setTimeout(runHighlight, 300);
+    highlightTimerRef.current = setTimeout(() => {
+      console.log("[tariff-highlight] setTimeout fired, calling runHighlight");
+      runHighlight();
+    }, 300);
   };
 
   const formatAmountValue = (amount?: number | null) => {
