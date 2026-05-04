@@ -9034,11 +9034,14 @@ namespace Enrollment.Controllers
                 {
                     conn.Open();
 
-                    // 1. Update Claims table: BillNo only (no SlNo column here)
+                    // 1. Update Claims table: BillNo, and ensure RoomDays/ICUDays are non-zero
+                    //    (some validations block save when both are 0)
                     var cmdClaims = conn.CreateCommand();
                     cmdClaims.CommandText = @"
                         UPDATE Claims
-                        SET    BillNo = @BillNo
+                        SET    BillNo  = @BillNo,
+                               RoomDays = CASE WHEN ISNULL(RoomDays, 0) = 0 AND ISNULL(ICUDays, 0) = 0 THEN 1 ELSE RoomDays END,
+                               ICUDays  = CASE WHEN ISNULL(RoomDays, 0) = 0 AND ISNULL(ICUDays, 0) = 0 THEN 1 ELSE ICUDays  END
                         WHERE  ID = @ClaimID
                           AND  ISNULL(Deleted, 0) = 0";
                     cmdClaims.Parameters.AddWithValue("@BillNo",  billNoVal);
