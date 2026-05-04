@@ -463,13 +463,15 @@ export function ResultView({
     console.log("[tariff-highlight] targetWrapper found, textLayer=", !!textLayer, "spans=", spans.length);
 
     if (spans.length === 0) {
-      if (highlightAttemptsRef.current < 20) {
+      if (highlightAttemptsRef.current < 5) {
+        // Give react-pdf a few chances to render the text layer
         highlightAttemptsRef.current++;
-        // Increase delay progressively to give page time to render
-        const delay = Math.min(300 + highlightAttemptsRef.current * 200, 1500);
+        const delay = Math.min(300 + highlightAttemptsRef.current * 300, 1200);
         highlightTimerRef.current = setTimeout(runHighlight, delay);
+        return;
       }
-      return;
+      // Text layer never populated — this is a scanned PDF.
+      // Fall through to Strategy B (pdfjs direct text extraction + canvas overlay).
     }
 
     // Clear old highlights
