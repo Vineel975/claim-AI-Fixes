@@ -488,8 +488,11 @@ export function ResultView({
 
     // STRATEGY A: pdfText direct search — when highlightName is absent,
     // highlightText is the AI-extracted verbatim PDF text. Search word-by-word.
+    console.log("[tariff-highlight] Strategy A: highlightText=", highlightText, "highlightName=", highlightName);
+    console.log("[tariff-highlight] positionedSpans=", positionedSpans.length, "sample:", positionedSpans.slice(0,3).map(s=>JSON.stringify(s.textContent)));
     if (!highlightName && highlightText && highlightText.length > 5) {
       const searchWords = normalize(highlightText).split(" ").filter(w => w.length > 3);
+      console.log("[tariff-highlight] searchWords=", searchWords);
       if (searchWords.length > 0) {
         let bestSpan: HTMLElement | null = null;
         let bestHits = 0;
@@ -499,6 +502,7 @@ export function ResultView({
           const hits = searchWords.filter(w => t.includes(w)).length;
           if (hits > bestHits) { bestHits = hits; bestSpan = span; }
         }
+        console.log("[tariff-highlight] bestHits=", bestHits, "bestSpan text=", bestSpan?.textContent, "threshold=", Math.min(2, searchWords.length));
         if (bestSpan && bestHits >= Math.min(2, searchWords.length)) {
           highlightLine(getSpanTopPx(bestSpan)!);
           pendingHighlightRef.current = null;
