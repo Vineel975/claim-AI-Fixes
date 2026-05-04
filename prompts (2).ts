@@ -145,6 +145,8 @@ Return:
       2) { code: "PPN OPH 01 A", name: "Lens (maximum admissible)", amount: 7000, pdfText: "cataract (Excluding lens)-Phaco (maximum admissible lens - 7000)", pdfPageNumber: 2 }
     - pdfText: copy the EXACT verbatim text fragment from the tariff PDF row/line for this item — enough to uniquely identify it by text search (minimum: the procedure name as written in the tariff).
     - pdfPageNumber: the 1-based page number in the TARIFF PDF where this item appears.
+    - pdfRowTopPct: approximate vertical position of the TOP of this row as % of page height (0=top, 100=bottom). Estimate visually. Example: row is 60% down the page → 60.
+    - pdfRowBottomPct: approximate vertical position of the BOTTOM of this row as % of page height. Usually pdfRowTopPct + 2 to 4 for a single-line row.
     - Do not merge procedure and lens into one entry.
     - Preserve tariff-side amounts as written; do not reduce using hospital bill amounts.
   lensType → Lens/IOL type if mentioned (e.g., Monofocal, Multifocal, Toric). If not mentioned, return exactly: "cant determine".
