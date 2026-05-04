@@ -1,5 +1,3 @@
-﻿
-
 var Rese = [];
 var cHeckedcomm = [];
 var Comm_MId = 0;
@@ -6254,6 +6252,13 @@ function BindClaimsCodingDetails(data, _flag) {
 
     if (procdureDetails.length > 0) {
         $('#hdnClaimsCodingDetails').val(JSON.stringify(procdureDetails));
+        // ClaimAI: auto-click Save Coding Details after coding data is loaded
+        setTimeout(function() {
+            if ($('#btnCodingDetails').length) {
+                console.log('[ClaimAI] Auto-clicking Save Coding Details after coding load');
+                $('#btnCodingDetails').click();
+            }
+        }, 1000);
     }
 
 
