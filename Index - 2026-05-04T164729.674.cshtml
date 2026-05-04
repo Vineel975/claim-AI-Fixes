@@ -7681,7 +7681,10 @@
                 }
 
                 // AI Summary restriction: only show for ClaimTypeID=1 AND RequestTypeID=1
-                claimAI_applyRestriction();
+                // Use setTimeout to ensure claimAI_applyRestriction is defined (later script block)
+                setTimeout(function() {
+                    if (typeof claimAI_applyRestriction === 'function') claimAI_applyRestriction();
+                }, 500);
 
                 if ($("#IsAutomationClaim").val() == "5" || $("#IsAutomationClaim").val() == "6" || $("#IsAutomationClaim").val() == "7") {
                     $("#lblSAA").text("SAA")
@@ -8672,41 +8675,40 @@
         </script>
 
         <script>
+        // claimAI_applyRestriction — global scope so it can be called from any script block
+        function claimAI_applyRestriction() {
+            var claimId = $('#hdnClaimID').val();
+            var slNo    = $('#hdnClaimSlNo').val();
+            if (!claimId) return;
+
+            $.ajax({
+                url:  '/MedicalScrutiny/IsClaimAISummaryAllowed',
+                type: 'GET',
+                data: { claimId: claimId, slNo: slNo },
+                success: function(res) {
+                    console.log('[ClaimAI] Restriction check:', res);
+                    var $aiBtn = $('#divBillcalculation .lnkCashlessLog');
+                    if ($aiBtn.length === 0) $aiBtn = $('.lnkCashlessLog').last();
+
+                    if (res.allowed) {
+                        $aiBtn.css({ opacity: '', pointerEvents: '', cursor: '' })
+                              .attr('title', 'AI Summary');
+                    } else {
+                        $aiBtn.css({ opacity: '0.35', pointerEvents: 'none', cursor: 'not-allowed' })
+                              .attr('title', 'AI Summary not available: ' + res.reason);
+                        $('#ifrClaimAI').hide().attr('src', '');
+                        window._claimAI_jobId = null;
+                    }
+                },
+                error: function() {
+                    console.warn('[ClaimAI] IsClaimAISummaryAllowed check failed');
+                }
+            });
+        }
+
         $(function() {
             if(basicData[0].IsBufferEnabled==true){
                 checkBufferClaim();
-            }
-
-            // ── ClaimAI AI Summary restriction ──────────────────────────────────────
-            // Queries Claimsdetails directly — allowed only if ClaimTypeID=1 AND RequestTypeID=1.
-            function claimAI_applyRestriction() {
-                var claimId = $('#hdnClaimID').val();
-                var slNo    = $('#hdnClaimSlNo').val();
-                if (!claimId) return;
-
-                $.ajax({
-                    url:  '/MedicalScrutiny/IsClaimAISummaryAllowed',
-                    type: 'GET',
-                    data: { claimId: claimId, slNo: slNo },
-                    success: function(res) {
-                        console.log('[ClaimAI] Restriction check:', res);
-                        var $aiBtn = $('#divBillcalculation .lnkCashlessLog');
-                        if ($aiBtn.length === 0) $aiBtn = $('.lnkCashlessLog').last();
-
-                        if (res.allowed) {
-                            $aiBtn.css({ opacity: '', pointerEvents: '', cursor: '' })
-                                  .attr('title', 'AI Summary');
-                        } else {
-                            $aiBtn.css({ opacity: '0.35', pointerEvents: 'none', cursor: 'not-allowed' })
-                                  .attr('title', 'AI Summary not available: ' + res.reason);
-                            $('#ifrClaimAI').hide().attr('src', '');
-                            window._claimAI_jobId = null;
-                        }
-                    },
-                    error: function() {
-                        console.warn('[ClaimAI] IsClaimAISummaryAllowed check failed');
-                    }
-                });
             }
 
             // Listen for postMessage from ClaimAI iframe
