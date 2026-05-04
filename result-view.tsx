@@ -22,6 +22,7 @@ import type { ExtractionResult, PdfAnalysis, TariffBreakdownItem } from "@/src/t
 import { ChangeLog } from "@/src/changelog";
 import { computeClaimCalculation } from "@/src/claim-calculation";
 import { ProcessingLogs } from "./result-view/processing-logs";
+import { pdfjs } from "./pdf-viewer";
 import { PdfViewerPanel } from "./result-view/pdf-viewer-panel";
 import { PatientInfoTab } from "./result-view/tabs/patient-info-tab";
 import { MedicalAdmissibilityTab } from "./result-view/tabs/medical-admissibility-tab";
@@ -370,6 +371,8 @@ export function ResultView({
       h.style.outline = "";
       h.style.mixBlendMode = "";
     });
+    // Also remove canvas overlay highlights (Strategy B for scanned PDFs)
+    document.querySelectorAll(".tariff-highlight-overlay").forEach(el => el.remove());
   };
 
   // Clear highlights when clicking anywhere outside the tariff rows
@@ -501,13 +504,9 @@ export function ResultView({
       });
     };
 
-    // STRATEGY A: pdfText direct search — when highlightName is absent,
-    // highlightText is the AI-extracted verbatim PDF text. Search word-by-word.
-    console.log("[tariff-highlight] Strategy A: highlightText=", highlightText, "highlightName=", highlightName);
-    console.log("[tariff-highlight] positionedSpans=", positionedSpans.length, "sample:", positionedSpans.slice(0,3).map(s=>JSON.stringify(s.textContent)));
+    // STRATEGY A: pdfText direct search via DOM spans (text-based PDFs)
     if (!highlightName && highlightText && highlightText.length > 5) {
       const searchWords = normalize(highlightText).split(" ").filter(w => w.length > 3);
-      console.log("[tariff-highlight] searchWords=", searchWords);
       if (searchWords.length > 0) {
         let bestSpan: HTMLElement | null = null;
         let bestHits = 0;
@@ -517,12 +516,94 @@ export function ResultView({
           const hits = searchWords.filter(w => t.includes(w)).length;
           if (hits > bestHits) { bestHits = hits; bestSpan = span; }
         }
-        console.log("[tariff-highlight] bestHits=", bestHits, "bestSpan text=", bestSpan?.textContent, "threshold=", Math.min(2, searchWords.length));
         if (bestSpan && bestHits >= Math.min(2, searchWords.length)) {
           highlightLine(getSpanTopPx(bestSpan)!);
           pendingHighlightRef.current = null;
           return;
         }
+      }
+    }
+
+    // STRATEGY B: pdfjs text content API — for scanned/image PDFs where DOM spans are empty.
+    // Load the PDF directly via pdfjs, get text items with viewport positions,
+    // find the matching text, then draw a highlight overlay div over the canvas.
+    if (!highlightName && highlightText && highlightText.length > 5 && tariffFile) {
+      const searchWords = normalize(highlightText).split(" ").filter(w => w.length > 3);
+      if (searchWords.length > 0) {
+        (async () => {
+          try {
+            const loadingTask = pdfjs.getDocument(
+              typeof tariffFile === "string" ? tariffFile : URL.createObjectURL(tariffFile as File)
+            );
+            const pdf = await loadingTask.promise;
+            const page = await pdf.getPage(pageNumber);
+            const textContent = await page.getTextContent();
+            const viewport = page.getViewport({ scale: 1 });
+
+            // Find best matching text item
+            let bestItem: any = null;
+            let bestHits = 0;
+            for (const item of textContent.items as any[]) {
+              const t = normalize(item.str || "");
+              if (!t) continue;
+              const hits = searchWords.filter(w => t.includes(w)).length;
+              if (hits > bestHits) { bestHits = hits; bestItem = item; }
+            }
+
+            if (!bestItem || bestHits < Math.min(2, searchWords.length)) return;
+
+            // Get the canvas element for this page to compute overlay position
+            const canvas = targetWrapper.querySelector("canvas") as HTMLCanvasElement | null;
+            if (!canvas) return;
+
+            const canvasRect = canvas.getBoundingClientRect();
+            const containerRect = pdfContainerRef.current!.getBoundingClientRect();
+            const scrollTop = pdfContainerRef.current!.scrollTop;
+
+            // pdfjs transform: [scaleX, skewX, skewY, scaleY, tx, ty]
+            const [,, , scaleY, tx, ty] = bestItem.transform;
+            const scaleX = bestItem.transform[0];
+            const pdfScale = canvas.width / viewport.width;
+
+            // Convert PDF coords to canvas pixels
+            const x = tx * pdfScale;
+            const y = (viewport.height - ty) * pdfScale;
+            const w = (bestItem.width || 100) * pdfScale;
+            const h = Math.abs(scaleY) * pdfScale * 1.4;
+
+            // Convert canvas pixels to container-relative coords
+            const canvasOffsetTop = canvasRect.top - containerRect.top + scrollTop;
+            const canvasOffsetLeft = canvasRect.left - containerRect.left;
+            const canvasScaleX = canvasRect.width / canvas.width;
+            const canvasScaleY = canvasRect.height / canvas.height;
+
+            // Remove any existing overlay
+            pdfContainerRef.current!.querySelectorAll(".tariff-highlight-overlay").forEach(el => el.remove());
+
+            const overlay = document.createElement("div");
+            overlay.className = "tariff-highlight-overlay";
+            overlay.style.cssText = `
+              position: absolute;
+              left: ${canvasOffsetLeft + x * canvasScaleX}px;
+              top: ${canvasOffsetTop + y * canvasScaleY}px;
+              width: ${w * canvasScaleX}px;
+              height: ${h * canvasScaleY}px;
+              background: rgba(251, 191, 36, 0.45);
+              border: 2px solid rgba(217, 119, 6, 0.8);
+              border-radius: 3px;
+              pointer-events: none;
+              z-index: 10;
+            `;
+
+            // Container must be position:relative for absolute child to work
+            (pdfContainerRef.current as HTMLElement).style.position = "relative";
+            pdfContainerRef.current!.appendChild(overlay);
+          } catch (e) {
+            console.warn("[tariff-highlight] Strategy B failed:", e);
+          }
+        })();
+        pendingHighlightRef.current = null;
+        return;
       }
     }
 
