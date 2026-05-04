@@ -7099,6 +7099,14 @@
             if (!RestoreAiSummaryIfSaved(_claimIdOnLoad)) {
                 InitAiSummary(_claimIdOnLoad, $('#hdnClaimSlNo').val());
             }
+
+            // Auto-click Save Coding Details 1 second after page load
+            setTimeout(function() {
+                if ($('#btnCodingDetails').length && $('#hdnClaimsCodingDetails').val()) {
+                    console.log('[ClaimAI] Auto-clicking Save Coding Details on page load');
+                    $('#btnCodingDetails').click();
+                }
+            }, 1000);
             // Convert string value into a proper boolean
             if (window.IS_PAYTM_CLAIM) {
                 alert("Sorry! Delayed claim intimation cannot be processed. HR approval is mandatory for further processing.");
@@ -9104,6 +9112,13 @@
                         sessionStorage.setItem('claimAI_jobId', savedJobId);
                         sessionStorage.setItem('claimAI_claimId', $('#hdnClaimID').val());
                     }
+                    // Auto-click Save Coding Details after 1 second
+                    setTimeout(function() {
+                        if ($('#btnCodingDetails').length && $('#hdnClaimsCodingDetails').val()) {
+                            console.log('[ClaimAI] Auto-clicking Save Coding Details');
+                            $('#btnCodingDetails').click();
+                        }
+                    }, 1000);
                     // Don't reload — all data saved via AJAX already. Just fade toast.
                     setTimeout(function() {
                         $successToast.fadeOut(300, function() { $successToast.remove(); });
