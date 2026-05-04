@@ -1530,6 +1530,7 @@ export function ResultView({
                     eyeType={displayAnalysis?.eyeType}
                     isAllInclusivePackage={displayAnalysis?.isAllInclusivePackage ?? false}
                     tariffPageNumber={displayAnalysis?.tariffPageNumber}
+                    tariffFileName={displayAnalysis?.tariffFileName}
                     tariffNotes={displayAnalysis?.tariffNotes}
                     tariffClarificationNote={displayAnalysis?.tariffClarificationNote}
                     tariffExtractionItem={displayAnalysis?.tariffExtractionItem}
