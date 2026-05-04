@@ -76,7 +76,7 @@ export interface TariffEnrichmentData {
   tariffExtractionItem: TariffBreakdownItem[];
   lensType?: string;
   lensTypePageNumber?: number | null;
-  lensTypeApproved?: LensTypeApproved;
+  lensTypeApproved?: LensTypeApproval;
   eyeType: EyeType;
   tariffPageNumber: number | null;
   tariffFileName?: string;
