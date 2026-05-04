@@ -1,3 +1,7 @@
+<button id="btnCodingDetails" type="submit" name="btnSumbitCoding" class="btn btn-block btn-success">
+                            SAVE CODING
+                        </button>
+
 Uncaught SyntaxError: Unexpected token 'else' (at MedicalScrutiny.js:1952:5)
 
 Index:1 Loading the script 'https://code.jquery.com/jquery-3.6.0.min.js' violates the following Content Security Policy directive: "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://static.site24x7rum.in http://static.site24x7rum.in https://static.cloudflareinsights.com https://cdnjs.cloudflare.com https://cdn.jsdelivr.net". Note that 'script-src-elem' was not explicitly set, so 'script-src' is used as a fallback. The action has been blocked.
