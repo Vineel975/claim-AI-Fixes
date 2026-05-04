@@ -222,7 +222,7 @@ export function FinancialSummaryTab({
   };
 
   // ── Editable breakdown rows ───────────────────────────────────────────────
-  type EditableRow = { id: string; name: string; amount: string };
+  type EditableRow = { id: string; name: string; amount: string; pdfText?: string; pdfPageNumber?: number };
 
   const toEditableRows = (items: HospitalBillBreakdownItem[]): EditableRow[] =>
     items.map((item, i) => ({
@@ -236,6 +236,8 @@ export function FinancialSummaryTab({
       id: `t-${i}`,
       name: item.name ?? "",
       amount: item.amount != null ? String(item.amount) : "",
+      pdfText: (item as any).pdfText ?? undefined,
+      pdfPageNumber: (item as any).pdfPageNumber ?? undefined,
     }));
 
   const [hospitalRows, setHospitalRows] = useState<EditableRow[]>([]);
@@ -505,7 +507,11 @@ export function FinancialSummaryTab({
                   const canHighlight = tariffLinkable && !!row.amount;
                   const handleRowClick = () => {
                     if (canHighlight) {
-                      onTariffAmountClick?.(tariffPageNumber, row.amount, row.name);
+                      // Prefer AI-extracted pdfText and pdfPageNumber for precise highlighting
+                      const page = row.pdfPageNumber ?? tariffPageNumber;
+                      const searchText = row.pdfText ?? row.amount;
+                      const searchName = row.pdfText ? undefined : row.name;
+                      onTariffAmountClick?.(page, searchText, searchName);
                     }
                   };
                   return (
