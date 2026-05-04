@@ -473,29 +473,48 @@ export function ResultView({
       else lineMap.set(t, [span]);
     }
 
-    // Score each line
-    let bestScore = -1;
-    let bestLineTop: number | null = null;
+    // Score each line — must score above threshold to be highlighted
+    type LineScoredEntry = { topPx: number; score: number; nameHits: number; exactAmount: boolean };
+    const scored: LineScoredEntry[] = [];
+
     for (const [topPx, lineSpans] of lineMap) {
-      const lineText   = normalize(lineSpans.map(s => s.textContent || "").join(" "));
-      const lineDigits = lineText.replace(/[^0-9]/g, "");
-      let score = 0;
-      for (const w of nameWords) { if (lineText.includes(w)) score += 2; }
-      if (amountDigits && lineDigits.includes(amountDigits)) score += 3;
-      if (lineText.length < 5) score -= 2;
-      if (score > bestScore) { bestScore = score; bestLineTop = topPx; }
+      const lineText    = normalize(lineSpans.map(s => s.textContent || "").join(" "));
+      const lineDigits  = lineText.replace(/[^0-9]/g, "");
+      if (lineText.length < 3) continue; // skip blank/tiny lines
+
+      let nameHits = 0;
+      for (const w of nameWords) { if (lineText.includes(w)) nameHits++; }
+
+      // Exact amount match: digits on this line equal the target amount digits exactly
+      const exactAmount = amountDigits.length > 0 && lineDigits === amountDigits;
+      // Loose amount match: line contains the amount digits somewhere
+      const looseAmount = amountDigits.length > 0 && lineDigits.includes(amountDigits);
+
+      const score = (nameHits * 2) + (exactAmount ? 5 : looseAmount ? 1 : 0);
+      scored.push({ topPx, score, nameHits, exactAmount });
     }
 
-    if ((bestScore <= 0 || bestLineTop === null) && amountDigits.length > 0) {
-      for (const [topPx, lineSpans] of lineMap) {
-        const lineDigits = lineSpans.map(s => s.textContent || "").join("").replace(/[^0-9]/g, "");
-        if (lineDigits.includes(amountDigits)) { bestLineTop = topPx; break; }
+    // Sort by score descending
+    scored.sort((a, b) => b.score - a.score);
+
+    // Best candidate: highest score, must have at least 1 name hit OR exact amount
+    const best = scored[0];
+    if (!best || (best.nameHits === 0 && !best.exactAmount)) {
+      // Last resort: find line whose digits exactly equal amountDigits
+      if (amountDigits.length > 0) {
+        const exactLine = scored.find(s => s.exactAmount);
+        if (!exactLine) { pendingHighlightRef.current = null; return; }
+        var bestLineTop: number | null = exactLine.topPx;
+      } else {
+        pendingHighlightRef.current = null; return;
       }
+    } else {
+      var bestLineTop: number | null = best.topPx;
     }
 
-    if (bestLineTop === null) { pendingHighlightRef.current = null; return; }
-
-    const anchorSpan = lineMap.get([...lineMap.keys()].find(k => Math.abs(k - bestLineTop!) <= 2)!)![0];
+    const anchorKey = [...lineMap.keys()].find(k => Math.abs(k - bestLineTop!) <= 2);
+    if (anchorKey === undefined) { pendingHighlightRef.current = null; return; }
+    const anchorSpan = lineMap.get(anchorKey)![0];
     const anchorTop  = getSpanTopPx(anchorSpan);
     if (anchorTop === null) { pendingHighlightRef.current = null; return; }
 
@@ -503,14 +522,16 @@ export function ResultView({
     const anchorLineIdx = topValues.findIndex(v => Math.abs(v - anchorTop) <= 2);
     if (anchorLineIdx === -1) { pendingHighlightRef.current = null; return; }
 
+    // Only highlight anchor line + next line if it's a pure text-wrap (no digits, small gap)
     const linesToHighlight = new Set<number>();
     linesToHighlight.add(anchorLineIdx);
     const nextIdx = anchorLineIdx + 1;
     if (nextIdx < topValues.length) {
-      const gap = Math.abs(topValues[nextIdx] - anchorTop);
+      const gap       = Math.abs(topValues[nextIdx] - anchorTop);
       const nextSpans = spans.filter(s => { const t = getSpanTopPx(s); return t !== null && Math.abs(t - topValues[nextIdx]) <= 2; });
       const nextText  = nextSpans.map(s => s.textContent || "").join("").trim();
-      if (gap < 12 && !/\d{3,}/.test(nextText)) linesToHighlight.add(nextIdx);
+      // Only include next line if gap is tiny AND it has no numbers (pure text continuation)
+      if (gap < 10 && !/[0-9]/.test(nextText)) linesToHighlight.add(nextIdx);
     }
 
     spans.forEach(span => {
