@@ -1592,10 +1592,7 @@ function Save_HospitalizationDetails(_ClaimID, _SlNo, _ProviderID, _ClaimTypeID,
                 DialogWarningMessage('Please enter patient condition date');
             }
         }
-        if ( basicData[0].ServiceTypeID == 1 && MakeZerofromUndefinedorEmpty($('#ddlApprovedFacility').val()) == 0 && ($('#hdnClaimStageID').val() == 5 || $('#hdnClaimStageID').val() == 38 || $('#hdnClaimStageID').val() == 28)) {
-            flag = false;
-            DialogWarningMessage('Please select approved accommodation');
-        }
+        // ClaimAI: Approved accommodation validation removed — handled by AI save flow
         if (basicData[0].ServiceSubTypeID == 11 || basicData[0].ServiceSubTypeID == 12 || basicData[0].ServiceSubTypeID == 13 || basicData[0].ServiceSubTypeID == 15
             || basicData[0].ServiceSubTypeID == 16 || basicData[0].ServiceSubTypeID == 25 || basicData[0].ServiceSubTypeID == 31 || basicData[0].ServiceSubTypeID == 35
             || basicData[0].ServiceSubTypeID == 37 || basicData[0].ServiceSubTypeID == 39 || basicData[0].ServiceSubTypeID == 43 || basicData[0].ServiceSubTypeID == 47
