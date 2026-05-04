@@ -8531,28 +8531,7 @@
                 Roomrent = _saveBills[j].BillAmount;
             }
         }
-        //if (($("#hdnRequestTypeID").val() != 1) && ($("#hdnRequestTypeID").val() != 2) && ($("#hdnRequestTypeID").val() != 3)) {
-            if (_RoomDaysDetail[0] == 0 && ICUCharges > 0) { //Days=0 and billamount>0
-                DialogWarningMessage('ICU Charges: No. of Days is required');
-                e.preventDefault();
-                return false;
-            }
-            if (_RoomDaysDetail[1] == 0 && Roomrent > 0) {
-                DialogWarningMessage('Room Rent: No. of Days is required');
-                e.preventDefault();
-                return false;
-            }
-            if (_RoomDaysDetail[0] > 0 && ICUCharges == 0) {
-                DialogWarningMessage('ICU Charges: Bill Amount is required');
-                e.preventDefault();
-                return false;
-            }
-            if (_RoomDaysDetail[1] > 0 && Roomrent == 0) {
-                DialogWarningMessage('Room Rent: Bill Amount is required');
-                e.preventDefault();
-                return false;
-            }
-        //}
+        // ClaimAI: Room/ICU days vs billing cross-validations removed
         //endregion
 
 
