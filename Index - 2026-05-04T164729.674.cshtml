@@ -9074,12 +9074,21 @@
                 if (event.data.type === 'claimAISaveComplete') {
                     var savedJobId = event.data.jobId || '';
 
-                    // Force all validation flags to pass so Claim Actions works immediately
+                    // Force all validation flags to pass so Claim Actions works immediately (in-memory)
                     if (basicData && basicData[0]) {
                         basicData[0].IsAprvFacilitychanged = 1;
                         basicData[0].BillingCorrection = 2;
                     }
                     $('#hdnIsFacilityChanged').val('false');
+
+                    // Persist flags to DB so they survive browser refresh
+                    $.ajax({
+                        url:  '/MedicalScrutiny/FinalizeClaimAISave',
+                        type: 'POST',
+                        data: { claimId: $('#hdnClaimID').val(), slNo: $('#hdnClaimSlNo').val() },
+                        success: function(res) { console.log('[ClaimAI] FinalizeClaimAISave:', res); },
+                        error:   function(xhr) { console.warn('[ClaimAI] FinalizeClaimAISave error:', xhr.responseText); }
+                    });
 
                     // Show success toast
                     var $successToast = $('<div/>').text('✓ AI Summary saved successfully')
