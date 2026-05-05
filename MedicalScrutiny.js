@@ -6726,34 +6726,35 @@ function Validate_AddClaimICDProcedure() {
         return;
     }
 
-    if (_billAmt != 0) {
-        var totPackageAmount = parseInt(_billAmt) + parseInt($('#txtCodingBillAmount').val());
-        if ($('#ddlBillingType').val() == 202) {
-            if (parseInt(totPackageAmount) > parseInt($('#hdnTotalTariffDBAmt').val())) {
-                //if (parseInt(totPackageAmount) > parseInt($('#txtTotalServicesEligibleAmount').val())) {
-                DialogResultMessage("Total bill amount exceeded.");
-                flag = false;
+    // ClaimAI: skip package amount validation when editing an existing row
+    if (!iseditcoding) {
+        if (_billAmt != 0) {
+            var totPackageAmount = parseInt(_billAmt) + parseInt($('#txtCodingBillAmount').val());
+            if ($('#ddlBillingType').val() == 202) {
+                if (parseInt(totPackageAmount) > parseInt($('#hdnTotalTariffDBAmt').val())) {
+                    DialogResultMessage("Total bill amount exceeded.");
+                    flag = false;
+                }
+            }
+            else {
+                if (parseInt(totPackageAmount) > parseInt($('#hdnTotalPackageDBAmt').val())) {
+                    DialogResultMessage("Total package amount exceeded.");
+                    flag = false;
+                }
             }
         }
         else {
-            if (parseInt(totPackageAmount) > parseInt($('#hdnTotalPackageDBAmt').val())) {
-                DialogResultMessage("Total package amount exceeded.");
-                flag = false;
+            if ($('#ddlBillingType').val() == 202) {
+                if (parseInt($('#txtCodingBillAmount').val()) > parseInt($('#hdnTotalTariffDBAmt').val())) {
+                    DialogResultMessage("Total bill amount exceeded.");
+                    flag = false;
+                }
             }
-        }
-    }
-    else {
-        if ($('#ddlBillingType').val() == 202) {
-            if (parseInt($('#txtCodingBillAmount').val()) > parseInt($('#hdnTotalTariffDBAmt').val())) {
-                //if (parseInt($('#txtCodingBillAmount').val()) > parseInt($('#txtTotalServicesEligibleAmount').val())) {
-                DialogResultMessage("Total bill amount exceeded.");
-                flag = false;
-            }
-        }
-        else {
-            if (parseInt($('#txtCodingBillAmount').val()) > parseInt($('#hdnTotalPackageDBAmt').val())) {
-                DialogResultMessage("Total package amount exceeded.");
-                flag = false;
+            else {
+                if (parseInt($('#txtCodingBillAmount').val()) > parseInt($('#hdnTotalPackageDBAmt').val())) {
+                    DialogResultMessage("Total package amount exceeded.");
+                    flag = false;
+                }
             }
         }
     }
