@@ -1949,7 +1949,7 @@ function ClaimRules_Insert(_stageID) {
     var supertopbalance = 0;
 
     // ClaimAI: BillingCorrection validation removed
-    else if (chkQP_MandatoryRecords()) {
+    if (chkQP_MandatoryRecords()) {
         DialogWarningMessage('You can not approve the claim as it is in query pending.');
     }
     else if ($("#ddlRequestType").val() != 1 && $("#ddlRequestType").val() != 2 && MakeNullfromUndefinedorEmpty(_dod) == null) {
@@ -10121,7 +10121,7 @@ function SaveCalculatedBill() {
         }
     }
     // ClaimAI: BillingCorrection validation removed
-    else if ($("#ddlRequestType").val() != 1 && $("#ddlRequestType").val() != 2 && MakeNullfromUndefinedorEmpty(_dod) == null) {
+    if ($("#ddlRequestType").val() != 1 && $("#ddlRequestType").val() != 2 && MakeNullfromUndefinedorEmpty(_dod) == null) {
         DialogWarningMessage('You can not approve the claim without Date of discharge');
         isbillcalculated = false;
     }
@@ -10130,10 +10130,10 @@ function SaveCalculatedBill() {
 
 function ClaimRules_Saving() {
     // ClaimAI: BillingCorrection validation removed
-    //else if (chkQP_MandatoryRecords()) {
+    //if (chkQP_MandatoryRecords()) {
     //    DialogWarningMessage('You can not approve the claim as it is in query pending.');
     //}
-    else if ($("#ddlRequestType").val() != 1 && $("#ddlRequestType").val() != 2 && MakeNullfromUndefinedorEmpty(_dod) == null) {
+    if ($("#ddlRequestType").val() != 1 && $("#ddlRequestType").val() != 2 && MakeNullfromUndefinedorEmpty(_dod) == null) {
         DialogWarningMessage('You can not approve the claim without Date of discharge');
         isbillcalculated = false;
     }
@@ -14893,7 +14893,7 @@ function ValidateReAuditInfo() {
     }
     //END SP3V-1697 Leena
     // ClaimAI: BillingCorrection validation removed
-    else if (chkQP_MandatoryRecords()) {
+    if (chkQP_MandatoryRecords()) {
         DialogWarningMessage('You can not approve the claim as it is in query pending.');
     }
     else if ($("#ddlRequestType").val() != 1 && $("#ddlRequestType").val() != 2 && MakeNullfromUndefinedorEmpty(_dod) == null) {
