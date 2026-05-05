@@ -722,8 +722,9 @@ namespace Enrollment.Controllers
 
                                 //SP3V-4017 Leena
                                 //DataTable dtTariffServiceDisc = (DataTable)JsonConvert.DeserializeObject(form["ServiceTariffAndDiscount"], (typeof(DataTable)));
-                                var objResponse1 = JsonConvert.DeserializeObject<List<servicediscountdetails>>(form["ServiceTariffAndDiscount"]);
-                                DataTable dtTariffServiceDisc = ToDataTable(objResponse1);
+                                var _tariffJson1 = (form["ServiceTariffAndDiscount"] ?? "").Trim();
+                                var objResponse1 = string.IsNullOrEmpty(_tariffJson1) ? new List<servicediscountdetails>() : JsonConvert.DeserializeObject<List<servicediscountdetails>>(_tariffJson1);
+                                DataTable dtTariffServiceDisc = ToDataTable(objResponse1 ?? new List<servicediscountdetails>());
                                 //End SP3V-4017 Leena
                                 if (dtClaimBillDetails == null || dtClaimBillDetails.Rows.Count == 0)
                                 {
@@ -959,8 +960,9 @@ namespace Enrollment.Controllers
                         //end SP3V-1058
                         //SP3V-4017 Leena
                         //DataTable dtTariffServiceDisc = (DataTable)JsonConvert.DeserializeObject(form["ServiceTariffAndDiscount"], (typeof(DataTable)));
-                        var objResponse1 = JsonConvert.DeserializeObject<List<servicediscountdetails>>(form["ServiceTariffAndDiscount"]);
-                        DataTable dtTariffServiceDisc = ToDataTable(objResponse1);
+                        var _tariffJson2 = (form["ServiceTariffAndDiscount"] ?? "").Trim();
+                        var objResponse1 = string.IsNullOrEmpty(_tariffJson2) ? new List<servicediscountdetails>() : JsonConvert.DeserializeObject<List<servicediscountdetails>>(_tariffJson2);
+                        DataTable dtTariffServiceDisc = ToDataTable(objResponse1 ?? new List<servicediscountdetails>());
 
                         //End SP3V-4017 Leena
                         if (dtClaimBillDetails == null || dtClaimBillDetails.Rows.Count == 0)
@@ -6692,6 +6694,7 @@ namespace Enrollment.Controllers
         public DataTable ToDataTable<T>(List<T> items)
         {
             DataTable dataTable = new DataTable(typeof(T).Name);
+            if (items == null || items.Count == 0) return dataTable;
             //Get all the properties
             PropertyInfo[] Props = typeof(T).GetProperties(BindingFlags.Public | BindingFlags.Instance);
             foreach (PropertyInfo prop in Props)
