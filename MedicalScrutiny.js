@@ -1,5 +1,3 @@
-
-
 var Rese = [];
 var cHeckedcomm = [];
 var Comm_MId = 0;
@@ -1950,9 +1948,7 @@ function ClaimRules_Insert(_stageID) {
     var topbalance = 0;
     var supertopbalance = 0;
 
-    if (MakeZerofromUndefinedorEmpty(basicData[0].BillingCorrection) != 2) {
-        DialogWarningMessage('The change in Billing details shall have an impact on total eligible amount of the claim. Request you to ensure the same eligible amount reflects in Coding section. Please modify Coding details.');
-    }
+    // ClaimAI: BillingCorrection validation removed
     else if (chkQP_MandatoryRecords()) {
         DialogWarningMessage('You can not approve the claim as it is in query pending.');
     }
@@ -2784,10 +2780,7 @@ function ClaimAudit_Insert(_stageID, _ctrlReason, _ctrlRemarks, _roleID, isAppro
     _claimdetails["ClaimedAmount"] = $("#txtClaimedAmount").val();
     _claimdetails["AgentID"] = $("#hdnAgentID").val();
     _claimdetails["issueID"] = basicData[0].IssueID;
-    if (MakeZerofromUndefinedorEmpty(basicData[0].BillingCorrection) != 2) {
-        DialogWarningMessage('The change in Billing details shall have an impact on total eligible amount of the claim. Request you to ensure the same eligible amount reflects in Coding section. Please modify Coding details.');
-        return false;
-    }
+    // ClaimAI: BillingCorrection validation removed
 
     if (isApprove == 0) {
         if (basicData[0].IssueID == 10 && ((_RequestTypeID == 1) || (_RequestTypeID == 2) || (_RequestTypeID == 3))) {
@@ -10126,9 +10119,7 @@ function SaveCalculatedBill() {
             return false;
         }
     }
-    if (MakeZerofromUndefinedorEmpty(basicData[0].BillingCorrection) != 2) {
-        DialogWarningMessage('The change in Billing details shall have an impact on total eligible amount of the claim. Request you to ensure the same eligible amount reflects in Coding section. Please modify Coding details.');
-    }
+    // ClaimAI: BillingCorrection validation removed
     else if ($("#ddlRequestType").val() != 1 && $("#ddlRequestType").val() != 2 && MakeNullfromUndefinedorEmpty(_dod) == null) {
         DialogWarningMessage('You can not approve the claim without Date of discharge');
         isbillcalculated = false;
@@ -10137,9 +10128,7 @@ function SaveCalculatedBill() {
 }
 
 function ClaimRules_Saving() {
-    if (MakeZerofromUndefinedorEmpty(basicData[0].BillingCorrection) != 2) {
-        DialogWarningMessage('The change in Billing details shall have an impact on total eligible amount of the claim. Request you to ensure the same eligible amount reflects in Coding section. Please modify Coding details.');
-    }
+    // ClaimAI: BillingCorrection validation removed
     //else if (chkQP_MandatoryRecords()) {
     //    DialogWarningMessage('You can not approve the claim as it is in query pending.');
     //}
@@ -11443,24 +11432,8 @@ function Enable_Buttons(_stageID) {
             }
         }
     }
-    if (basicData[0].ServiceTypeID == 1 && basicData[0].IsAprvFacilitychanged != 1 && ($('#hdnClaimStageID').val() == 5 || $('#hdnClaimStageID').val() == 38) &&
-        (basicData[0].RequestTypeID == 1 || basicData[0].RequestTypeID == 2 || basicData[0].RequestTypeID == 3)) {
-        _valid = false;
-        if (basicData[0].RequestTypeID == 1)
-            _valmsgs.push('Please select approved accommodation OR save hospitalization details again');
-        else
-            _valmsgs.push('Please select approved accommodation');
-    }
-
-    if ($("#hdnIsFacilityChanged").val() == "true") {
-        _valid = false;
-        _valmsgs.push('There could be an impact on the bill related amounts as the accommodation change. Please recheck and save the bill details.')
-    }
-
-    if (MakeZerofromUndefinedorEmpty(basicData[0].BillingCorrection) != 2) {
-        _valid = false;
-        _valmsgs.push('The change in Billing details shall have an impact on total eligible amount of the claim. Request you to ensure the same eligible amount reflects in Coding section. Please modify Coding details.');
-    }
+    // ClaimAI: Removed IsAprvFacilitychanged, IsFacilityChanged, and BillingCorrection
+    // validations — these are handled automatically by the AI save flow.
 
     if (_valid == null) {
         //  data.NextactionStage
@@ -14918,9 +14891,7 @@ function ValidateReAuditInfo() {
         return false;
     }
     //END SP3V-1697 Leena
-    if (MakeZerofromUndefinedorEmpty(basicData[0].BillingCorrection) != 2) {
-        DialogWarningMessage('The change in Billing details shall have an impact on total eligible amount of the claim. Request you to ensure the same eligible amount reflects in Coding section. Please modify Coding details.');
-    }
+    // ClaimAI: BillingCorrection validation removed
     else if (chkQP_MandatoryRecords()) {
         DialogWarningMessage('You can not approve the claim as it is in query pending.');
     }
