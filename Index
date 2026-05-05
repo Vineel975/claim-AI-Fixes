@@ -9153,18 +9153,9 @@
                         }
                     }, 3500);
 
-                    // Step 3 (6s): Populate hdnAccomdationRoomdays + click Save Billing Details
-                    setTimeout(function() {
-                        var roomVal2 = parseInt($('#txtRoomDays').val()) || 1;
-                        var icuVal2  = parseInt($('#txtICUDays').val())  || 0;
-                        if (roomVal2 === 0 && icuVal2 === 0) { roomVal2 = 1; }
-                        var estVal2  = parseInt($('#txtExtimatedDays').val()) || (roomVal2 + icuVal2);
-                        $('#hdnAccomdationRoomdays').val(JSON.stringify([{ Roomdays: String(roomVal2), ICUdays: String(icuVal2), ExtimatedDays: String(estVal2) }]));
-                        console.log('[ClaimAI] Clicking Save Billing Details');
-                        $('#btnServiceBillDetailsSave').show().click().hide();
-                    }, 6000);
-
-                    // Step 4 (9s): Populate hdnAccomdationRoomdays, then trigger coding save
+                    // Step 3 (6s): Populate hdnAccomdationRoomdays, then trigger coding save
+                    // NOTE: Billing is already saved via SaveBillingForClaimAI AJAX — no need to
+                    // click Save Billing button (which does a full form submit/page reload)
                     setTimeout(function() {
                         var roomVal3 = parseInt($('#txtRoomDays').val()) || 1;
                         var icuVal3  = parseInt($('#txtICUDays').val())  || 0;
@@ -9191,7 +9182,7 @@
                         }).css({ position: 'absolute', left: '-9999px' }).appendTo('#form');
                         $tmpBtn[0].click();
                         setTimeout(function() { $tmpBtn.remove(); }, 500);
-                    }, 9000);
+                    }, 6000);
                     // Fade toast after 2 seconds
                     setTimeout(function() {
                         $successToast.fadeOut(300, function() { $successToast.remove(); });
