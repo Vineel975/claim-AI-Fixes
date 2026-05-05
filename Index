@@ -7107,20 +7107,30 @@
             if (_pendingCodingSave === '1' && _pendingCodingClaimId === _claimIdOnLoad) {
                 sessionStorage.removeItem('claimAI_pendingCodingSave');
                 sessionStorage.removeItem('claimAI_pendingCodingClaimId');
-                console.log('[ClaimAI] Pending coding save detected — clicking Save Coding Details in 3s');
+                console.log('[ClaimAI] Pending coding save detected');
+
+                // Step A (1.5s): Call Get_ServiceBillingDetails to populate bill section
+                // and hdnServiceTariffAndDiscount before coding save
                 setTimeout(function() {
-                    // Populate hdnAccomdationRoomdays from current field values before coding save
-                    // The controller reads this on EVERY billing-related save including coding
+                    console.log('[ClaimAI] Loading bill details before coding click...');
+                    if (typeof Get_ServiceBillingDetails === 'function') {
+                        Get_ServiceBillingDetails($('#hdnClaimID').val(), $('#hdnClaimSlNo').val(), 0);
+                    }
+                }, 1500);
+
+                // Step B (4s): After bill details loaded, populate hdnAccomdationRoomdays
+                // then click Save Coding Details
+                setTimeout(function() {
                     var roomVal = parseInt($('#txtRoomDays').val()) || 1;
                     var icuVal  = parseInt($('#txtICUDays').val())  || 0;
                     if (roomVal === 0 && icuVal === 0) { roomVal = 1; }
                     var estimatedVal = parseInt($('#txtExtimatedDays').val()) || (roomVal + icuVal);
                     var accomData = [{ Roomdays: String(roomVal), ICUdays: String(icuVal), ExtimatedDays: String(estimatedVal) }];
                     $('#hdnAccomdationRoomdays').val(JSON.stringify(accomData));
-                    console.log('[ClaimAI] hdnAccomdationRoomdays populated before coding click:', JSON.stringify(accomData));
+                    console.log('[ClaimAI] hdnAccomdationRoomdays populated:', JSON.stringify(accomData));
                     console.log('[ClaimAI] Clicking Save Coding Details now');
                     $('#btnCodingDetails').click();
-                }, 3000);
+                }, 4000);
             }
 
 
