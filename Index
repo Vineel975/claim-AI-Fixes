@@ -7100,27 +7100,46 @@
                 InitAiSummary(_claimIdOnLoad, $('#hdnClaimSlNo').val());
             }
 
-            // After page reload from Save Hospitalization Details, auto-click Save Coding Details
-            // Wait for coding data to be loaded by Retrieve_ClaimsCodingDetails first
+            // After page reload from Save Hospitalization Details, auto-click Save Coding Details.
+            // Strategy: wait for page to fully initialise (Retrieve_ClaimsCodingDetails runs on load),
+            // then click regardless — if coding data is already there click immediately,
+            // if not poll for up to 20s. As a hard fallback, click at 12s no matter what.
             var _pendingCodingSave = sessionStorage.getItem('claimAI_pendingCodingSave');
             var _pendingCodingClaimId = sessionStorage.getItem('claimAI_pendingCodingClaimId');
             if (_pendingCodingSave === '1' && _pendingCodingClaimId === _claimIdOnLoad) {
                 sessionStorage.removeItem('claimAI_pendingCodingSave');
                 sessionStorage.removeItem('claimAI_pendingCodingClaimId');
-                console.log('[ClaimAI] Pending coding save detected — will auto-click after coding data loads');
-                // Poll until hdnClaimsCodingDetails is populated, then click
+                console.log('[ClaimAI] Pending coding save detected — scheduling auto-click');
+
+                var _codingClicked = false;
+
+                function _doClickCodingSave(reason) {
+                    if (_codingClicked) return;
+                    _codingClicked = true;
+                    console.log('[ClaimAI] Clicking Save Coding Details — reason:', reason);
+                    $('#btnCodingDetails').click();
+                }
+
+                // Poll every 500ms — click as soon as hdnClaimsCodingDetails has data
                 var _codingPollCount = 0;
                 var _codingPoll = setInterval(function() {
                     _codingPollCount++;
-                    if ($('#hdnClaimsCodingDetails').val()) {
+                    var val = $('#hdnClaimsCodingDetails').val();
+                    if (val && val.length > 2) {
                         clearInterval(_codingPoll);
-                        console.log('[ClaimAI] Coding data ready — clicking Save Coding Details');
-                        $('#btnCodingDetails').click();
-                    } else if (_codingPollCount > 30) {
+                        _doClickCodingSave('coding data ready after ' + (_codingPollCount * 500) + 'ms');
+                    } else if (_codingPollCount >= 40) {
+                        // 20s elapsed — give up polling
                         clearInterval(_codingPoll);
-                        console.warn('[ClaimAI] Coding data not ready after 15s — skipping auto-click');
+                        console.warn('[ClaimAI] Coding data never populated — hard fallback click');
+                        _doClickCodingSave('poll timeout fallback');
                     }
                 }, 500);
+
+                // Hard fallback: click at 12s regardless of poll result
+                setTimeout(function() {
+                    _doClickCodingSave('12s hard fallback');
+                }, 12000);
             }
 
 
