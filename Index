@@ -9129,21 +9129,49 @@
                         sessionStorage.setItem('claimAI_jobId', savedJobId);
                         sessionStorage.setItem('claimAI_claimId', $('#hdnClaimID').val());
                     }
-                    // Step 1: Ensure Room/ICU days are non-zero, then click Save Hospitalization Details
-                    // This triggers a page reload. After reload, we auto-click Save Coding Details.
+                    // Step 1: Ensure Room/ICU days are non-zero, populate hdnAccomdationRoomdays,
+                    // then click Save Hospitalization Details (triggers page reload).
+                    // After reload, auto-click Save Coding Details.
                     setTimeout(function() {
-                        // Set Room Days to 1 if zero
                         var $roomDays = $('#txtRoomDays');
                         var $icuDays  = $('#txtICUDays');
-                        if ($roomDays.length && (parseInt($roomDays.val()) || 0) === 0) {
-                            $roomDays.removeAttr('disabled').val('1');
-                            console.log('[ClaimAI] RoomDays set to 1');
+
+                        // Ensure both fields are enabled so we can read/write them
+                        $roomDays.removeAttr('disabled');
+                        $icuDays.removeAttr('disabled');
+
+                        var roomVal = parseInt($roomDays.val()) || 0;
+                        var icuVal  = parseInt($icuDays.val())  || 0;
+
+                        // If BOTH are zero, set RoomDays=1; if only one is zero leave it (non-zero total)
+                        if (roomVal === 0 && icuVal === 0) {
+                            $roomDays.val('1');
+                            roomVal = 1;
+                            console.log('[ClaimAI] RoomDays set to 1 (both were zero)');
                         }
-                        // Set ICU Days to 1 if zero
-                        if ($icuDays.length && (parseInt($icuDays.val()) || 0) === 0) {
-                            $icuDays.removeAttr('disabled').val('1');
-                            console.log('[ClaimAI] ICUDays set to 1');
+
+                        // Update estimated days field to match
+                        var estimatedDays = roomVal + icuVal;
+                        $('#txtExtimatedDays').val(estimatedDays);
+
+                        // CRITICAL: Populate hdnAccomdationRoomdays JSON before hosp save
+                        // The controller reads Accomationdays.Rows[0] — must have exactly 1 row
+                        var accomData = [{
+                            Roomdays:     $roomDays.val()            || '1',
+                            ICUdays:      $icuDays.val()             || '0',
+                            ExtimatedDays: $('#txtExtimatedDays').val() || '1'
+                        }];
+                        $('#hdnAccomdationRoomdays').val(JSON.stringify(accomData));
+                        console.log('[ClaimAI] hdnAccomdationRoomdays set:', JSON.stringify(accomData));
+
+                        // Guard: only proceed if values are valid
+                        var finalRoom = parseInt($roomDays.val()) || 0;
+                        var finalIcu  = parseInt($icuDays.val())  || 0;
+                        if (finalRoom === 0 && finalIcu === 0) {
+                            console.warn('[ClaimAI] Room/ICU days still zero — skipping hosp save click');
+                            return;
                         }
+
                         // Store flag so after page reload we auto-click Save Coding Details
                         sessionStorage.setItem('claimAI_pendingCodingSave', '1');
                         sessionStorage.setItem('claimAI_pendingCodingClaimId', $('#hdnClaimID').val());
