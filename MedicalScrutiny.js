@@ -5518,7 +5518,8 @@ function CodingCalculation(_packageDiscount) {
     iscodingcalculated = true;
     //alert(_discount);
     if (_billAmount != 0) {
-        Validate_AddClaimICDProcedure();
+        // ClaimAI: Validate_AddClaimICDProcedure removed from CodingCalculation
+        // — validation only needed on add/save, not during calculation
 
         var discountAmount = 0;
         var EligibleAmtAfterDiscount = 0;
