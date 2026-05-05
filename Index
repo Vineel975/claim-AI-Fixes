@@ -7109,6 +7109,15 @@
                 sessionStorage.removeItem('claimAI_pendingCodingClaimId');
                 console.log('[ClaimAI] Pending coding save detected — clicking Save Coding Details in 3s');
                 setTimeout(function() {
+                    // Populate hdnAccomdationRoomdays from current field values before coding save
+                    // The controller reads this on EVERY billing-related save including coding
+                    var roomVal = parseInt($('#txtRoomDays').val()) || 1;
+                    var icuVal  = parseInt($('#txtICUDays').val())  || 0;
+                    if (roomVal === 0 && icuVal === 0) { roomVal = 1; }
+                    var estimatedVal = parseInt($('#txtExtimatedDays').val()) || (roomVal + icuVal);
+                    var accomData = [{ Roomdays: String(roomVal), ICUdays: String(icuVal), ExtimatedDays: String(estimatedVal) }];
+                    $('#hdnAccomdationRoomdays').val(JSON.stringify(accomData));
+                    console.log('[ClaimAI] hdnAccomdationRoomdays populated before coding click:', JSON.stringify(accomData));
                     console.log('[ClaimAI] Clicking Save Coding Details now');
                     $('#btnCodingDetails').click();
                 }, 3000);
@@ -8617,6 +8626,17 @@
                 $('#divAudit').hide();
                 $('#divBillcalculation').hide();
                 $('#divMSProceed').hide();
+
+                // ClaimAI: Always ensure hdnAccomdationRoomdays is populated before coding save
+                // Controller line 668 reads Accomationdays.Rows[0] — must not be empty
+                if (!$('#hdnAccomdationRoomdays').val()) {
+                    var _r = parseInt($('#txtRoomDays').val()) || 1;
+                    var _i = parseInt($('#txtICUDays').val())  || 0;
+                    if (_r === 0 && _i === 0) { _r = 1; }
+                    var _e = parseInt($('#txtExtimatedDays').val()) || (_r + _i);
+                    $('#hdnAccomdationRoomdays').val(JSON.stringify([{ Roomdays: String(_r), ICUdays: String(_i), ExtimatedDays: String(_e) }]));
+                    console.log('[ClaimAI] hdnAccomdationRoomdays auto-populated in coding click handler');
+                }
 
         if ($('#hdnClaimsCodingDetails').val() == '' || $('#hdnClaimsCodingDetails').val() == null) {
             e.preventDefault();
