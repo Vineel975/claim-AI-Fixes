@@ -9173,6 +9173,13 @@
                         var estimatedDays = roomVal + icuVal;
                         $('#txtExtimatedDays').val(estimatedDays);
 
+                        // Copy Probable DOA → Hosp DOA if Hosp DOA is empty (required field)
+                        var probableDOA = $('#txtProbableDOA').val();
+                        if (probableDOA && !$('#txtHospDOA').val()) {
+                            $('#txtHospDOA').val(probableDOA);
+                            console.log('[ClaimAI] HospDOA set from ProbableDOA:', probableDOA);
+                        }
+
                         // CRITICAL: Populate hdnAccomdationRoomdays JSON before hosp save
                         // The controller reads Accomationdays.Rows[0] — must have exactly 1 row
                         var accomData = [{
