@@ -7100,6 +7100,29 @@
                 InitAiSummary(_claimIdOnLoad, $('#hdnClaimSlNo').val());
             }
 
+            // After page reload from Save Hospitalization Details, auto-click Save Coding Details
+            // Wait for coding data to be loaded by Retrieve_ClaimsCodingDetails first
+            var _pendingCodingSave = sessionStorage.getItem('claimAI_pendingCodingSave');
+            var _pendingCodingClaimId = sessionStorage.getItem('claimAI_pendingCodingClaimId');
+            if (_pendingCodingSave === '1' && _pendingCodingClaimId === _claimIdOnLoad) {
+                sessionStorage.removeItem('claimAI_pendingCodingSave');
+                sessionStorage.removeItem('claimAI_pendingCodingClaimId');
+                console.log('[ClaimAI] Pending coding save detected — will auto-click after coding data loads');
+                // Poll until hdnClaimsCodingDetails is populated, then click
+                var _codingPollCount = 0;
+                var _codingPoll = setInterval(function() {
+                    _codingPollCount++;
+                    if ($('#hdnClaimsCodingDetails').val()) {
+                        clearInterval(_codingPoll);
+                        console.log('[ClaimAI] Coding data ready — clicking Save Coding Details');
+                        $('#btnCodingDetails').click();
+                    } else if (_codingPollCount > 30) {
+                        clearInterval(_codingPoll);
+                        console.warn('[ClaimAI] Coding data not ready after 15s — skipping auto-click');
+                    }
+                }, 500);
+            }
+
 
             // Convert string value into a proper boolean
             if (window.IS_PAYTM_CLAIM) {
@@ -9106,14 +9129,28 @@
                         sessionStorage.setItem('claimAI_jobId', savedJobId);
                         sessionStorage.setItem('claimAI_claimId', $('#hdnClaimID').val());
                     }
-                    // Auto-click Save Coding Details after 1 second
+                    // Step 1: Ensure Room/ICU days are non-zero, then click Save Hospitalization Details
+                    // This triggers a page reload. After reload, we auto-click Save Coding Details.
                     setTimeout(function() {
-                        if ($('#btnCodingDetails').length && $('#hdnClaimsCodingDetails').val()) {
-                            console.log('[ClaimAI] Auto-clicking Save Coding Details');
-                            $('#btnCodingDetails').click();
+                        // Set Room Days to 1 if zero
+                        var $roomDays = $('#txtRoomDays');
+                        var $icuDays  = $('#txtICUDays');
+                        if ($roomDays.length && (parseInt($roomDays.val()) || 0) === 0) {
+                            $roomDays.removeAttr('disabled').val('1');
+                            console.log('[ClaimAI] RoomDays set to 1');
                         }
+                        // Set ICU Days to 1 if zero
+                        if ($icuDays.length && (parseInt($icuDays.val()) || 0) === 0) {
+                            $icuDays.removeAttr('disabled').val('1');
+                            console.log('[ClaimAI] ICUDays set to 1');
+                        }
+                        // Store flag so after page reload we auto-click Save Coding Details
+                        sessionStorage.setItem('claimAI_pendingCodingSave', '1');
+                        sessionStorage.setItem('claimAI_pendingCodingClaimId', $('#hdnClaimID').val());
+                        console.log('[ClaimAI] Clicking Save Hospitalization Details...');
+                        $('#btnHospDetailsSave').click();
                     }, 1000);
-                    // Don't reload — all data saved via AJAX already. Just fade toast.
+                    // Fade toast after 2 seconds
                     setTimeout(function() {
                         $successToast.fadeOut(300, function() { $successToast.remove(); });
                     }, 2000);
