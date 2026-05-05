@@ -9153,7 +9153,7 @@
                         }
                     }, 3500);
 
-                    // Step 3 (6s): Populate hdnAccomdationRoomdays, then trigger coding save
+                    // Step 3 (15s): Populate hdnAccomdationRoomdays, then trigger coding save
                     // NOTE: Billing is already saved via SaveBillingForClaimAI AJAX — no need to
                     // click Save Billing button (which does a full form submit/page reload)
                     setTimeout(function() {
@@ -9182,7 +9182,7 @@
                         }).css({ position: 'absolute', left: '-9999px' }).appendTo('#form');
                         $tmpBtn[0].click();
                         setTimeout(function() { $tmpBtn.remove(); }, 500);
-                    }, 6000);
+                    }, 15000);
                     // Fade toast after 2 seconds
                     setTimeout(function() {
                         $successToast.fadeOut(300, function() { $successToast.remove(); });
