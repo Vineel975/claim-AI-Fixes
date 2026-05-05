@@ -584,6 +584,7 @@ namespace Enrollment.Controllers
 
         [HttpPost]
         [Authorize]
+        [ValidateInput(false)]
         public ActionResult Index(FormCollection form)
         {
             Int64 ClaimID = Convert.ToInt64(form["ClaimID"]);
